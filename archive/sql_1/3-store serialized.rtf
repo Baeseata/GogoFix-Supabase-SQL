@@ -1,0 +1,192 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2822
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\margl1440\margr1440\vieww11520\viewh8400\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 -- =========================================\
+-- store_serialized_list\
+-- =========================================\
+\
+-- 0) status enum\
+-- =========================================\
+DO $$\
+BEGIN\
+  CREATE TYPE public.serialized_status AS ENUM ('in_stock', 'in_transit', 'sold', 'repair', 'lost', 'wasted', 'void');\
+EXCEPTION\
+  WHEN duplicate_object THEN NULL;\
+END $$;\
+\
+-- =========================================\
+-- 1) table\
+-- =========================================\
+-- serialized item\uc0\u24211 \u23384 \u34920 \u65306 \u27599 \u19968 \u34892 \u20195 \u34920 \u19968 \u20214 \u23454 \u29289 \u65292 \u20165 \u36866 \u29992 \u20110  inventory_mode = 'serialized' \u30340 \u21830 \u21697 \
+CREATE TABLE IF NOT EXISTS public.store_serialized_list (\
+\
+  -- \uc0\u20840 \u23616 \u33258 \u22686 \u20027 \u38190 \u65292 \u20174  0 \u24320 \u22987 \u65292 \u19994 \u21153 \u23618 \u19981 \u24212 \u25163 \u21160 \u25351 \u23450 \
+  unit_id integer\
+    GENERATED ALWAYS AS IDENTITY (START WITH 0 MINVALUE 0)\
+    PRIMARY KEY,\
+\
+  -- \uc0\u38376 \u24215  ID\
+  store_id text NOT NULL,\
+\
+  -- \uc0\u20840 \u23616 \u21807 \u19968 \u24207 \u21015 \u21495 \u65288 \u22914  IMEI\u12289 SN\u65289 \u65292 \u19981 \u21487 \u22797 \u29992 \u65292 \u21363 \u20351  void / \u36719 \u21024 \u38500 \u21518 \u20173 \u27704 \u20037 \u21344 \u20301 \
+  serial text NOT NULL,\
+\
+  -- \uc0\u20851 \u32852  mother_inventory_list \u30340 \u20840 \u23616 \u21807 \u19968 \u20027 \u38190 \
+  unique_id int NOT NULL REFERENCES public.mother_inventory_list(unique_id),\
+\
+  -- \uc0\u21333 \u20214 \u38468 \u21152 \u23646 \u24615 \u65288 \u39068 \u33394 \u12289 \u23481 \u37327 \u12289 \u25104 \u33394 \u31561 \u65289 \u65292 \u32467 \u26500 \u33258 \u30001 \
+  attribute jsonb DEFAULT NULL,\
+\
+  -- \uc0\u35813 \u21333 \u20214 \u30340 \u23454 \u38469 \u25104 \u26412 \
+  -- INSERT \uc0\u26102 \u33509 \u20026 \u31354 \u65292 \u33258 \u21160 \u20174 \u27597 \u34920  default_cost \u32487 \u25215 \u65307 \u20043 \u21518 \u29420 \u31435 \u32500 \u25252 \
+  cost numeric(10,2) DEFAULT NULL,\
+\
+  -- \uc0\u35813 \u21333 \u20214 \u30340 \u24403 \u21069 \u21806 \u20215 \
+  -- INSERT \uc0\u26102 \u33509 \u20026 \u31354 \u65292 \u33258 \u21160 \u20174 \u27597 \u34920  default_price \u32487 \u25215 \u65307 \u20043 \u21518 \u29420 \u31435 \u32500 \u25252 \
+  price numeric(10,2) DEFAULT NULL,\
+\
+  -- \uc0\u21069 \u21488 \u26368 \u20302 \u25253 \u20215 \u25351 \u23548 \u20215 \
+  last_price numeric(10,2) DEFAULT NULL,\
+\
+  -- \uc0\u21333 \u20214 \u24403 \u21069 \u19994 \u21153 \u29366 \u24577 \
+  status public.serialized_status NOT NULL DEFAULT 'in_stock',\
+\
+  created_at timestamptz NOT NULL DEFAULT now(),\
+  updated_at timestamptz NOT NULL DEFAULT now(),\
+\
+  -- \uc0\u36719 \u21024 \u38500 \u26102 \u38388 \u25139 \u65307 NULL \u34920 \u31034 \u27491 \u24120 \u65292 \u38750  NULL \u34920 \u31034 \u24050 \u21024 \u38500 \
+  -- \uc0\u27880 \u24847 \u65306 \u36719 \u21024 \u38500 \u21518  serial \u20173 \u21344 \u20301 \u65292 \u19981 \u21487 \u22797 \u29992 \u65288 \u20840 \u23616 \u21807 \u19968 \u32422 \u26463 \u19981 \u24102  WHERE \u26465 \u20214 \u65289 \
+  deleted_at timestamptz DEFAULT NULL\
+);\
+\
+-- =========================================\
+-- 2) serial \uc0\u20840 \u23616 \u21807 \u19968 \u32422 \u26463 \u65288 DEFERRABLE\u65292 \u25903 \u25345 \u20107 \u21153 \u20869 \u20132 \u25442 \u65289 \
+-- =========================================\
+-- \uc0\u19981 \u20351 \u29992  partial index\u65306 \u21363 \u20351  deleted_at IS NOT NULL \u25110  status = 'void'\u65292 \
+-- serial \uc0\u20173 \u28982 \u19981 \u21487 \u34987 \u26032 \u35760 \u24405 \u22797 \u29992 \u65292 \u20445 \u35777 \u20840 \u29983 \u21629 \u21608 \u26399 \u21807 \u19968 \
+DO $$\
+BEGIN\
+  ALTER TABLE public.store_serialized_list\
+    ADD CONSTRAINT uq_store_serialized_serial\
+    UNIQUE (serial)\
+    DEFERRABLE INITIALLY IMMEDIATE;\
+EXCEPTION\
+  WHEN duplicate_object THEN NULL;\
+END $$;\
+\
+-- =========================================\
+-- 3) Trigger A\uc0\u65306 \u26657 \u39564 \u27597 \u34920  inventory_mode = 'serialized'\u65292 \u24182 \u22312  INSERT \u26102 \u32487 \u25215  cost/price\
+-- =========================================\
+CREATE OR REPLACE FUNCTION public.store_serialized_enforce_mode()\
+RETURNS trigger\
+LANGUAGE plpgsql\
+AS $$\
+DECLARE\
+  v_mode  public.inventory_mode;\
+  m_cost  numeric(10,2);\
+  m_price numeric(10,2);\
+BEGIN\
+  -- \uc0\u20174 \u27597 \u34920 \u35835 \u21462  inventory_mode \u21450 \u40664 \u35748 \u20215 \u26684 \
+  SELECT inventory_mode, default_cost, default_price\
+    INTO v_mode, m_cost, m_price\
+  FROM public.mother_inventory_list\
+  WHERE unique_id = NEW.unique_id;\
+\
+  IF NOT FOUND THEN\
+    RAISE EXCEPTION 'mother_inventory_list.unique_id % not found', NEW.unique_id;\
+  END IF;\
+\
+  IF v_mode IS DISTINCT FROM 'serialized' THEN\
+    RAISE EXCEPTION 'unique_id % is not serialized (mode=%)', NEW.unique_id, v_mode;\
+  END IF;\
+\
+  -- \uc0\u20165  INSERT \u26102 \u20174 \u27597 \u34920 \u32487 \u25215 \u40664 \u35748  cost/price\u65307 UPDATE \u26102 \u19981 \u35206 \u30422 \u65288 \u21333 \u20214 \u20215 \u26684 \u29420 \u31435 \u32500 \u25252 \u65289 \
+  IF TG_OP = 'INSERT' THEN\
+    IF NEW.cost  IS NULL THEN NEW.cost  := m_cost;  END IF;\
+    IF NEW.price IS NULL THEN NEW.price := m_price; END IF;\
+  END IF;\
+\
+  RETURN NEW;\
+END;\
+$$;\
+\
+DROP TRIGGER IF EXISTS trg_store_serialized_enforce_mode ON public.store_serialized_list;\
+CREATE TRIGGER trg_store_serialized_enforce_mode\
+BEFORE INSERT OR UPDATE ON public.store_serialized_list\
+FOR EACH ROW\
+EXECUTE FUNCTION public.store_serialized_enforce_mode();\
+\
+-- =========================================\
+-- 4) Trigger B\uc0\u65306 updated_at \u33258 \u21160 \u32500 \u25252 \u65288 \u22797 \u29992  public.set_updated_at()\u65289 \
+-- =========================================\
+DROP TRIGGER IF EXISTS trg_store_serialized_updated_at ON public.store_serialized_list;\
+CREATE TRIGGER trg_store_serialized_updated_at\
+BEFORE UPDATE ON public.store_serialized_list\
+FOR EACH ROW\
+EXECUTE FUNCTION public.set_updated_at();\
+\
+-- =========================================\
+-- 5) \uc0\u32034 \u24341 \
+-- =========================================\
+-- \uc0\u26597 \u26576 \u38376 \u24215 \u30340 \u24207 \u21015 \u21495 \u21830 \u21697 \u65288 \u25353 \u29366 \u24577 \u36807 \u28388 \u65289 \
+CREATE INDEX IF NOT EXISTS idx_store_serialized_store_status\
+  ON public.store_serialized_list (store_id, status);\
+\
+-- \uc0\u26597 \u26576  SKU \u30340 \u25152 \u26377 \u24207 \u21015 \u21495 \u21333 \u20214 \
+CREATE INDEX IF NOT EXISTS idx_store_serialized_unique_id\
+  ON public.store_serialized_list (unique_id);\
+\
+-- \uc0\u36719 \u21024 \u38500 \u36807 \u28388 \u65306 \u21152 \u36895 \u26597 \u27963 \u36291 \u35760 \u24405 \
+CREATE INDEX IF NOT EXISTS idx_store_serialized_active\
+  ON public.store_serialized_list (store_id)\
+  WHERE deleted_at IS NULL;\
+\
+\
+-- =========================================\
+-- =========================================\
+-- 6) \uc0\u12304 \u34917 \u19969 \u12305 \u26356 \u26032 \u27597 \u34920 \u35302 \u21457 \u22120 \u20989 \u25968 \u65306 \u25318 \u25130  inventory_mode \u21464 \u26356 \u26102 \u65292 \
+--    \uc0\u21516 \u26102 \u26816 \u26597  store_inventory_list \u21644  store_serialized_list\
+--    \uc0\u27492 \u20989 \u25968 \u26367 \u25442 \u27597 \u34920  SQL \u20013 \u21516 \u21517 \u20989 \u25968 \u65292 \u35302 \u21457 \u22120 \u32465 \u23450 \u26080 \u38656 \u37325 \u24314 \
+-- =========================================\
+-- =========================================\
+CREATE OR REPLACE FUNCTION public.mother_inventory_block_mode_change()\
+RETURNS trigger\
+LANGUAGE plpgsql\
+AS $$\
+DECLARE\
+  active_inv  int;\
+  active_ser  int;\
+BEGIN\
+  -- \uc0\u20165 \u22312  inventory_mode \u23454 \u38469 \u21457 \u29983 \u21464 \u21270 \u26102 \u25165 \u20171 \u20837 \
+  IF NEW.inventory_mode IS DISTINCT FROM OLD.inventory_mode THEN\
+\
+    -- \uc0\u26816 \u26597  store_inventory_list \u20013 \u26159 \u21542 \u26377 \u27963 \u36291 \u34892 \u65288 service / tracked / untracked\u65289 \
+    SELECT COUNT(*)\
+      INTO active_inv\
+    FROM public.store_inventory_list\
+    WHERE unique_id = NEW.unique_id\
+      AND deleted_at IS NULL;\
+\
+    -- \uc0\u26816 \u26597  store_serialized_list \u20013 \u26159 \u21542 \u26377 \u27963 \u36291 \u34892 \u65288 serialized\u65289 \
+    SELECT COUNT(*)\
+      INTO active_ser\
+    FROM public.store_serialized_list\
+    WHERE unique_id = NEW.unique_id\
+      AND deleted_at IS NULL;\
+\
+    IF (active_inv + active_ser) > 0 THEN\
+      RAISE EXCEPTION\
+        'Cannot change inventory_mode for unique_id %: '\
+        '% active store_inventory row(s) + % active store_serialized row(s) exist. '\
+        'Soft-delete all store rows first, then retry.',\
+        NEW.unique_id, active_inv, active_ser;\
+    END IF;\
+  END IF;\
+\
+  RETURN NEW;\
+END;\
+$$;}

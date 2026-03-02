@@ -1,0 +1,85 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2822
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fnil\fcharset0 Menlo-Regular;}
+{\colortbl;\red255\green255\blue255;\red202\green202\blue202;}
+{\*\expandedcolortbl;;\cssrgb\c83137\c83137\c83137;}
+\margl1440\margr1440\vieww11520\viewh8400\viewkind0
+\deftab720
+\pard\pardeftab720\partightenfactor0
+
+\f0\fs26 \cf2 \expnd0\expndtw0\kerning0
+-- =========================================\
+-- supplier_list \uc0\u20379 \u24212 \u21830 \u20027 \u34920 \
+-- =========================================\
+\
+CREATE TABLE IF NOT EXISTS public.supplier_list (\
+\
+  -- \uc0\u20840 \u23616 \u33258 \u22686 \u20027 \u38190 \u65292 \u20174  0 \u24320 \u22987 \
+  supplier_id integer\
+    GENERATED ALWAYS AS IDENTITY (START WITH 0 MINVALUE 0)\
+    PRIMARY KEY,\
+\
+  -- \uc0\u20379 \u24212 \u21830 \u21517 \u31216 \u65292 \u27963 \u36291 \u35760 \u24405 \u20869 \u21807 \u19968 \u65288 \u35265 \u19979 \u26041  partial unique index\u65289 \
+  supplier_name text NOT NULL,\
+\
+  -- \uc0\u20379 \u24212 \u21830 \u30005 \u35805 \
+  supplier_phone_number text DEFAULT NULL,\
+\
+  -- \uc0\u20379 \u24212 \u21830 \u37038 \u31665 \
+  supplier_email_address text DEFAULT NULL,\
+\
+  -- \uc0\u21019 \u24314 \u35813 \u20379 \u24212 \u21830 \u35760 \u24405 \u30340 \u38376 \u24215  ID\
+  created_store_id text NOT NULL REFERENCES public.store_list(store_id),\
+\
+  created_at timestamptz NOT NULL DEFAULT now(),\
+  updated_at timestamptz NOT NULL DEFAULT now(),\
+\
+  -- \uc0\u36719 \u21024 \u38500 \u26102 \u38388 \u25139 \u65307 NULL \u34920 \u31034 \u27491 \u24120 \u65292 \u38750  NULL \u34920 \u31034 \u24050 \u20572 \u29992 \
+  deleted_at timestamptz DEFAULT NULL\
+);\
+\
+-- =========================================\
+-- 1) \uc0\u20379 \u24212 \u21830 \u21517 \u31216 \u21807 \u19968 \u32422 \u26463 \u65288 \u20165 \u27963 \u36291 \u35760 \u24405 \u29983 \u25928 \u65289 \
+-- =========================================\
+CREATE UNIQUE INDEX IF NOT EXISTS uq_supplier_name_active\
+  ON public.supplier_list (supplier_name)\
+  WHERE deleted_at IS NULL;\
+\
+-- =========================================\
+-- 2) updated_at \uc0\u33258 \u21160 \u32500 \u25252 \u35302 \u21457 \u22120 \
+-- =========================================\
+DROP TRIGGER IF EXISTS trg_supplier_list_updated_at ON public.supplier_list;\
+CREATE TRIGGER trg_supplier_list_updated_at\
+BEFORE UPDATE ON public.supplier_list\
+FOR EACH ROW\
+EXECUTE FUNCTION public.set_updated_at();\
+\
+-- =========================================\
+-- 3) \uc0\u27963 \u36291 \u20379 \u24212 \u21830 \u32034 \u24341 \
+-- =========================================\
+CREATE INDEX IF NOT EXISTS idx_supplier_active\
+  ON public.supplier_list (supplier_id)\
+  WHERE deleted_at IS NULL;\
+\
+\
+-- =========================================\
+-- =========================================\
+-- 4)\uc0\u12304 \u34917 \u19969 \u12305 mother_inventory_list\u65306 supplier text \u8594  supplier_id \u22806 \u38190 \
+-- =========================================\
+-- =========================================\
+\
+-- \uc0\u21024 \u38500 \u26087 \u30340  text \u21015 \
+DO $$\
+BEGIN\
+  ALTER TABLE public.mother_inventory_list DROP COLUMN IF EXISTS supplier;\
+EXCEPTION\
+  WHEN undefined_column THEN NULL;\
+END $$;\
+\
+-- \uc0\u28155 \u21152 \u26032 \u30340 \u22806 \u38190 \u21015 \
+DO $$\
+BEGIN\
+  ALTER TABLE public.mother_inventory_list\
+    ADD COLUMN supplier_id integer DEFAULT NULL REFERENCES public.supplier_list(supplier_id);\
+EXCEPTION\
+  WHEN duplicate_column THEN NULL;\
+END $$;}

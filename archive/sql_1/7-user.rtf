@@ -1,0 +1,123 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2822
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fnil\fcharset0 Menlo-Regular;}
+{\colortbl;\red255\green255\blue255;\red202\green202\blue202;}
+{\*\expandedcolortbl;;\cssrgb\c83137\c83137\c83137;}
+\margl1440\margr1440\vieww11520\viewh8400\viewkind0
+\deftab720
+\pard\pardeftab720\partightenfactor0
+
+\f0\fs26 \cf2 \expnd0\expndtw0\kerning0
+-- =========================================\
+-- user_list \uc0\u29992 \u25143 \u20027 \u34920 \
+-- =========================================\
+-- \uc0\u33258 \u31649 \u30331 \u24405 \u20307 \u31995 \u65292 \u23494 \u30721 \u23383 \u27573 \u23384 \u20648  bcrypt/argon2 \u21704 \u24076 \u20540 \u65292 \u20005 \u31105 \u23384 \u26126 \u25991 \
+CREATE TABLE IF NOT EXISTS public.user_list (\
+\
+  -- \uc0\u29992 \u25143 \u20840 \u23616 \u33258 \u22686 \u20027 \u38190 \u65292 \u20174  0 \u24320 \u22987 \u65292 \u19994 \u21153 \u23618 \u19981 \u24212 \u25163 \u21160 \u25351 \u23450 \
+  user_id integer\
+    GENERATED ALWAYS AS IDENTITY (START WITH 0 MINVALUE 0)\
+    PRIMARY KEY,\
+\
+  -- \uc0\u30331 \u24405 \u29992 \u25143 \u21517 \u65292 \u27963 \u36291 \u29992 \u25143 \u20013 \u21807 \u19968 \u65288 \u35265 \u19979 \u26041  partial unique index\u65289 \
+  -- \uc0\u36719 \u21024 \u38500 \u21518 \u37322 \u25918 \u29992 \u25143 \u21517 \u65292 \u26032 \u29992 \u25143 \u21487 \u22797 \u29992 \
+  user_name text NOT NULL,\
+\
+  -- \uc0\u23494 \u30721 \u21704 \u24076 \u65288 bcrypt / argon2\u65289 \u65292 \u20801 \u35768 \u20026 \u31354 \u65288 \u22914  SSO \u30331 \u24405 \u25110 \u21021 \u22987 \u26410 \u35774 \u23494 \u30721 \u65289 \
+  user_password text DEFAULT NULL,\
+\
+  -- \uc0\u29992 \u25143 \u22791 \u27880 \u25551 \u36848 \
+  description text DEFAULT NULL,\
+\
+  -- \uc0\u29992 \u25143 \u25163 \u26426 \u21495 \
+  user_phone_number text DEFAULT NULL,\
+\
+  -- \uc0\u29992 \u25143 \u37038 \u31665 \
+  user_email_address text DEFAULT NULL,\
+\
+  created_at timestamptz NOT NULL DEFAULT now(),\
+  updated_at timestamptz NOT NULL DEFAULT now(),\
+\
+  -- \uc0\u21019 \u24314 \u35813 \u29992 \u25143 \u30340 \u38376 \u24215  ID\
+  created_store_id text NOT NULL REFERENCES public.store_list(store_id),\
+\
+  -- \uc0\u36719 \u21024 \u38500 \u26102 \u38388 \u25139 \u65307 NULL \u34920 \u31034 \u27491 \u24120 \u65292 \u38750  NULL \u34920 \u31034 \u24050 \u20572 \u29992 \
+  deleted_at timestamptz DEFAULT NULL,\
+\
+  -- \uc0\u29992 \u25143 \u21517 \u19981 \u33021 \u20026 \u31354 \u30333 \u23383 \u31526 \u20018 \
+  CONSTRAINT user_list_user_name_not_blank\
+    CHECK (length(btrim(user_name)) > 0)\
+);\
+\
+-- =========================================\
+-- 1) \uc0\u29992 \u25143 \u21517 \u21807 \u19968 \u32422 \u26463 \u65288 \u20165 \u27963 \u36291 \u29992 \u25143 \u29983 \u25928 \u65289 \
+-- =========================================\
+-- \uc0\u36719 \u21024 \u38500 \u21518 \u29992 \u25143 \u21517 \u37322 \u25918 \u65292 \u21487 \u34987 \u26032 \u29992 \u25143 \u20351 \u29992 \
+CREATE UNIQUE INDEX IF NOT EXISTS uq_user_name_active\
+  ON public.user_list (user_name)\
+  WHERE deleted_at IS NULL;\
+\
+-- =========================================\
+-- 2) updated_at \uc0\u33258 \u21160 \u32500 \u25252 \u35302 \u21457 \u22120 \u65288 \u22797 \u29992  public.set_updated_at()\u65289 \
+-- =========================================\
+DROP TRIGGER IF EXISTS trg_user_list_updated_at ON public.user_list;\
+CREATE TRIGGER trg_user_list_updated_at\
+BEFORE UPDATE ON public.user_list\
+FOR EACH ROW\
+EXECUTE FUNCTION public.set_updated_at();\
+\
+-- =========================================\
+-- 3) \uc0\u27963 \u36291 \u29992 \u25143 \u32034 \u24341 \
+-- =========================================\
+CREATE INDEX IF NOT EXISTS idx_user_active\
+  ON public.user_list (user_id)\
+  WHERE deleted_at IS NULL;\
+\
+\
+-- =========================================\
+-- =========================================\
+-- store_user_rights \uc0\u38376 \u24215 -\u29992 \u25143 -\u26435 \u38480 \u20851 \u32852 \u34920 \
+-- =========================================\
+-- =========================================\
+-- \uc0\u35760 \u24405 \u26576 \u20010 \u29992 \u25143 \u22312 \u26576 \u20010 \u38376 \u24215 \u25317 \u26377 \u21738 \u20010 \u26435 \u38480 \u27169 \u26495 \
+-- \uc0\u19977 \u21015 \u22343 \u26377 \u22806 \u38190 \u32422 \u26463 \u65292 \u25968 \u25454 \u24211 \u23618 \u38754 \u20445 \u35777 \u65306 \
+--   - \uc0\u19981 \u33021 \u24341 \u29992 \u19981 \u23384 \u22312 \u30340 \u29992 \u25143 \u12289 \u38376 \u24215 \u12289 \u26435 \u38480 \u27169 \u26495 \
+--   - \uc0\u21024 \u38500 \u26435 \u38480 \u27169 \u26495 \u21069 \u24517 \u39035 \u20808 \u36801 \u31227 \u25152 \u26377 \u20851 \u32852 \u29992 \u25143 \u65288 \u22806 \u38190 \u25318 \u25130 \u65289 \
+--   - \uc0\u21024 \u38500 \u38376 \u24215 \u21069 \u24517 \u39035 \u20808 \u28165 \u29702 \u20851 \u32852 \u35760 \u24405 \
+CREATE TABLE IF NOT EXISTS public.store_user_rights (\
+\
+  -- \uc0\u29992 \u25143  ID\u65292 \u22806 \u38190 \u25351 \u21521  user_list\
+  user_id integer NOT NULL REFERENCES public.user_list(user_id),\
+\
+  -- \uc0\u38376 \u24215  ID\u65292 \u22806 \u38190 \u25351 \u21521  store_list\
+  store_id text NOT NULL REFERENCES public.store_list(store_id),\
+\
+  -- \uc0\u26435 \u38480 \u27169 \u26495  ID\u65292 \u22806 \u38190 \u25351 \u21521  user_rights_templates\
+  template_id integer NOT NULL REFERENCES public.user_rights_templates(template_id),\
+\
+  created_at timestamptz NOT NULL DEFAULT now(),\
+  updated_at timestamptz NOT NULL DEFAULT now(),\
+\
+  -- \uc0\u32852 \u21512 \u20027 \u38190 \u65306 \u21516 \u19968 \u29992 \u25143 \u22312 \u21516 \u19968 \u38376 \u24215 \u21482 \u33021 \u26377 \u19968 \u20010 \u26435 \u38480 \u27169 \u26495 \
+  CONSTRAINT store_user_rights_pkey PRIMARY KEY (user_id, store_id)\
+);\
+\
+-- =========================================\
+-- 1) updated_at \uc0\u33258 \u21160 \u32500 \u25252 \u35302 \u21457 \u22120 \
+-- =========================================\
+DROP TRIGGER IF EXISTS trg_store_user_rights_updated_at ON public.store_user_rights;\
+CREATE TRIGGER trg_store_user_rights_updated_at\
+BEFORE UPDATE ON public.store_user_rights\
+FOR EACH ROW\
+EXECUTE FUNCTION public.set_updated_at();\
+\
+-- =========================================\
+-- 2) \uc0\u32034 \u24341 \u65306 \u26597 \u26576 \u38376 \u24215 \u30340 \u25152 \u26377 \u29992 \u25143 \u26435 \u38480 \
+-- =========================================\
+CREATE INDEX IF NOT EXISTS idx_store_user_rights_store\
+  ON public.store_user_rights (store_id);\
+\
+-- =========================================\
+-- 3) \uc0\u32034 \u24341 \u65306 \u26597 \u26576 \u26435 \u38480 \u27169 \u26495 \u34987 \u21738 \u20123 \u29992 \u25143 \u20351 \u29992 \u65288 \u21024 \u38500 \u27169 \u26495 \u21069 \u26816 \u26597 \u65289 \
+-- =========================================\
+CREATE INDEX IF NOT EXISTS idx_store_user_rights_template\
+  ON public.store_user_rights (template_id);}

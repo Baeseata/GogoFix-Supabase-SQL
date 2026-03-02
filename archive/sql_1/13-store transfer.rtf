@@ -1,0 +1,205 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2822
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\margl1440\margr1440\vieww11520\viewh8400\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 -- =========================================\
+-- store_transfer_list \uc0\u38376 \u24215 \u38388 \u35843 \u25320 \u20027 \u34920 \
+-- =========================================\
+-- \uc0\u35760 \u24405 \u38376 \u24215 \u38388 \u30340 \u24211 \u23384 \u35843 \u25320 \u21333 \u65292 \u25903 \u25345  tracked / untracked / serialized \u21830 \u21697 \
+-- \uc0\u20165 \u22312 \u32852 \u32593 \u26102 \u21487 \u25805 \u20316 \u65292 \u19981 \u25903 \u25345 \u31163 \u32447 \
+-- \uc0\u35774 \u35745 \u19978 \u21482 \u20801 \u35768  INSERT \u21644 \u30830 \u35748 \u25910 \u36135 \u26102 \u30340  UPDATE\u65292 \u19981 \u24212 \u21024 \u38500 \u65288 \u20294 \u25968 \u25454 \u24211 \u23618 \u38754 \u19981 \u20570 \u30828 \u24615 \u25318 \u25130 \u65292 \u30041 \u21518 \u38376 \u65289 \
+\
+CREATE TABLE IF NOT EXISTS public.store_transfer_list (\
+\
+  -- \uc0\u20840 \u23616 \u33258 \u22686 \u20027 \u38190 \u65292 \u20174  0 \u24320 \u22987 \
+  store_transfer_id integer\
+    GENERATED ALWAYS AS IDENTITY (START WITH 0 MINVALUE 0)\
+    PRIMARY KEY,\
+\
+  -- \uc0\u35843 \u20986 \u38376 \u24215 \u65288 \u21457 \u36135 \u26041 \u65289 \
+  store_id text NOT NULL REFERENCES public.store_list(store_id),\
+\
+  -- \uc0\u35843 \u20837 \u38376 \u24215 \u65288 \u25910 \u36135 \u26041 \u65289 \
+  target_store_id text NOT NULL REFERENCES public.store_list(store_id),\
+\
+  -- \uc0\u21019 \u24314 \u35843 \u25320 \u21333 \u30340 \u29992 \u25143 \
+  created_by_user_id integer NOT NULL REFERENCES public.user_list(user_id),\
+\
+  -- \uc0\u30830 \u35748 \u25910 \u36135 \u30340 \u29992 \u25143 \u65307 NULL \u34920 \u31034 \u23578 \u26410 \u30830 \u35748 \u65288 \u20173 \u22312 \u36884 \u20013 \u65289 \
+  confirmed_by_user_id integer DEFAULT NULL REFERENCES public.user_list(user_id),\
+\
+  -- \uc0\u30830 \u35748 \u25910 \u36135 \u26102 \u38388 \u65307 NULL \u34920 \u31034 \u23578 \u26410 \u30830 \u35748 \
+  -- confirmed_at \uc0\u21644  confirmed_by_user_id \u24517 \u39035 \u21516 \u26102 \u20026 \u31354 \u25110 \u21516 \u26102 \u26377 \u20540 \u65288 \u35265 \u19979 \u26041  CHECK\u65289 \
+  confirmed_at timestamptz DEFAULT NULL,\
+\
+  -- \uc0\u35843 \u25320 \u24635 \u25104 \u26412 \u65288 \u23458 \u25143 \u31471 \u35745 \u31639 \u21518 \u20256 \u20837 \u65289 \
+  cost_total numeric(10,2) NOT NULL DEFAULT 0,\
+\
+  -- \uc0\u35843 \u25320 \u24635 \u20215 \u20540 \u65288 \u23458 \u25143 \u31471 \u35745 \u31639 \u21518 \u20256 \u20837 \u65289 \
+  price_total numeric(10,2) NOT NULL DEFAULT 0,\
+\
+  created_at timestamptz NOT NULL DEFAULT now(),\
+  updated_at timestamptz NOT NULL DEFAULT now(),\
+\
+  -- \uc0\u19981 \u33021 \u33258 \u24049 \u36716 \u32473 \u33258 \u24049 \
+  CONSTRAINT store_transfer_not_self\
+    CHECK (store_id != target_store_id),\
+\
+  -- \uc0\u30830 \u35748 \u29366 \u24577 \u19968 \u33268 \u24615 \u65306 confirmed_by_user_id \u21644  confirmed_at \u24517 \u39035 \u21516 \u26102 \u20026 \u31354 \u25110 \u21516 \u26102 \u26377 \u20540 \
+  CONSTRAINT store_transfer_confirm_consistency\
+    CHECK (\
+      (confirmed_by_user_id IS NULL AND confirmed_at IS NULL)\
+      OR\
+      (confirmed_by_user_id IS NOT NULL AND confirmed_at IS NOT NULL)\
+    )\
+);\
+\
+-- =========================================\
+-- \uc0\u32034 \u24341 \
+-- =========================================\
+\
+-- \uc0\u26597 \u26576 \u38376 \u24215 \u21457 \u20986 \u30340 \u35843 \u25320 \u21333 \
+CREATE INDEX IF NOT EXISTS idx_transfer_store\
+  ON public.store_transfer_list (store_id, created_at DESC);\
+\
+-- \uc0\u26597 \u26576 \u38376 \u24215 \u25910 \u21040 \u30340 \u35843 \u25320 \u21333 \
+CREATE INDEX IF NOT EXISTS idx_transfer_target_store\
+  ON public.store_transfer_list (target_store_id, created_at DESC);\
+\
+-- \uc0\u26597 \u24453 \u30830 \u35748 \u30340 \u35843 \u25320 \u21333 \u65288 \u26410 \u30830 \u35748  = \u20173 \u22312 \u36884 \u20013 \u65289 \
+CREATE INDEX IF NOT EXISTS idx_transfer_pending\
+  ON public.store_transfer_list (target_store_id)\
+  WHERE confirmed_at IS NULL;\
+\
+-- =========================================\
+-- updated_at \uc0\u33258 \u21160 \u32500 \u25252 \
+-- =========================================\
+DROP TRIGGER IF EXISTS trg_store_transfer_updated_at ON public.store_transfer_list;\
+CREATE TRIGGER trg_store_transfer_updated_at\
+BEFORE UPDATE ON public.store_transfer_list\
+FOR EACH ROW\
+EXECUTE FUNCTION public.set_updated_at();\
+\
+\
+-- =========================================\
+-- =========================================\
+-- store_transfer_line_list \uc0\u35843 \u25320 \u26126 \u32454 \u34920 \
+-- =========================================\
+-- =========================================\
+\
+CREATE TABLE IF NOT EXISTS public.store_transfer_line_list (\
+\
+  -- \uc0\u20840 \u23616 \u33258 \u22686 \u20027 \u38190 \u65292 \u20174  0 \u24320 \u22987 \
+  line_id integer\
+    GENERATED ALWAYS AS IDENTITY (START WITH 0 MINVALUE 0)\
+    PRIMARY KEY,\
+\
+  -- \uc0\u25152 \u23646 \u35843 \u25320 \u21333 \
+  store_transfer_id integer NOT NULL REFERENCES public.store_transfer_list(store_transfer_id),\
+\
+  -- \uc0\u20851 \u32852 \u27597 \u34920 \u21830 \u21697 \
+  unique_id integer NOT NULL REFERENCES public.mother_inventory_list(unique_id),\
+\
+  -- \uc0\u24207 \u21015 \u21495 \u21830 \u21697 \u20851 \u32852 \u65306 serialized \u21830 \u21697 \u24517 \u39035 \u26377 \u20540 \u65292 \u38750  serialized \u21830 \u21697 \u24517 \u39035 \u20026  NULL\
+  -- \uc0\u30001 \u35302 \u21457 \u22120 \u26657 \u39564 \u19968 \u33268 \u24615 \u65288 \u35265 \u19979 \u26041  Trigger\u65289 \
+  unit_id integer DEFAULT NULL REFERENCES public.store_serialized_list(unit_id),\
+\
+  -- \uc0\u21830 \u21697 \u21517 \u31216 \u24555 \u29031 \u65292 \u30001 \u23458 \u25143 \u31471 \u20174  store_inventory_list \u25110  store_serialized_list \u35835 \u21462 \u22635 \u20837 \
+  item_name text NOT NULL,\
+\
+  -- \uc0\u21333 \u20301 \u25104 \u26412 \u24555 \u29031 \
+  cost_per_unit numeric(10,2) NOT NULL DEFAULT 0,\
+\
+  -- \uc0\u21333 \u20301 \u21806 \u20215 \u24555 \u29031 \
+  price_per_unit numeric(10,2) NOT NULL DEFAULT 0,\
+\
+  -- \uc0\u35843 \u25320 \u25968 \u37327 \u65306 serialized \u21830 \u21697 \u24517 \u39035 \u20026  1\u65292 \u20854 \u20182 \u21830 \u21697 \u30001 \u23458 \u25143 \u31471 \u22635 \u20889 \
+  qty integer NOT NULL,\
+\
+  -- \uc0\u24207 \u21015 \u21495 \u25991 \u26412 \u65306 \u20165  serialized \u21830 \u21697 \u26377 \u20540 \
+  serial text DEFAULT NULL,\
+\
+  -- qty \uc0\u24517 \u39035 \u22823 \u20110  0\u65288 \u35843 \u25320 \u19981 \u24212 \u26377  0 \u25110 \u36127 \u25968 \u65289 \
+  CONSTRAINT transfer_line_qty_positive\
+    CHECK (qty > 0)\
+);\
+\
+-- =========================================\
+-- Trigger\uc0\u65306 \u26657 \u39564  inventory_mode \u19968 \u33268 \u24615 \
+-- =========================================\
+-- - service \uc0\u21830 \u21697 \u65306 \u25298 \u32477 \u65288 service \u19981 \u36861 \u36394 \u24211 \u23384 \u65292 \u26080 \u38656 \u35843 \u25320 \u65289 \
+-- - serialized \uc0\u21830 \u21697 \u65306 qty \u24517 \u39035 \u20026  1\u65292 unit_id \u21644  serial \u24517 \u39035 \u26377 \u20540 \
+-- - tracked / untracked \uc0\u21830 \u21697 \u65306 unit_id \u21644  serial \u24517 \u39035 \u20026  NULL\
+CREATE OR REPLACE FUNCTION public.transfer_line_enforce_mode()\
+RETURNS trigger\
+LANGUAGE plpgsql\
+AS $$\
+DECLARE\
+  v_mode public.inventory_mode;\
+BEGIN\
+  SELECT inventory_mode\
+    INTO v_mode\
+  FROM public.mother_inventory_list\
+  WHERE unique_id = NEW.unique_id;\
+\
+  IF NOT FOUND THEN\
+    RAISE EXCEPTION 'mother_inventory_list.unique_id % not found', NEW.unique_id;\
+  END IF;\
+\
+  -- service \uc0\u21830 \u21697 \u19981 \u21487 \u35843 \u25320 \
+  IF v_mode = 'service' THEN\
+    RAISE EXCEPTION 'service item (unique_id=%) cannot be transferred', NEW.unique_id;\
+  END IF;\
+\
+  -- serialized \uc0\u21830 \u21697 \u65306 qty \u24517 \u39035 \u20026  1\u65292 \u19988 \u24517 \u39035 \u26377  unit_id \u21644  serial\
+  IF v_mode = 'serialized' THEN\
+    IF NEW.qty != 1 THEN\
+      RAISE EXCEPTION 'serialized item (unique_id=%) must have qty=1', NEW.unique_id;\
+    END IF;\
+    IF NEW.unit_id IS NULL THEN\
+      RAISE EXCEPTION 'serialized item (unique_id=%) requires unit_id', NEW.unique_id;\
+    END IF;\
+    IF NEW.serial IS NULL THEN\
+      RAISE EXCEPTION 'serialized item (unique_id=%) requires serial', NEW.unique_id;\
+    END IF;\
+  END IF;\
+\
+  -- tracked / untracked \uc0\u21830 \u21697 \u65306 \u19981 \u24212 \u26377  unit_id \u21644  serial\
+  IF v_mode IN ('tracked', 'untracked') THEN\
+    IF NEW.unit_id IS NOT NULL THEN\
+      RAISE EXCEPTION 'non-serialized item (unique_id=%) must not have unit_id', NEW.unique_id;\
+    END IF;\
+    IF NEW.serial IS NOT NULL THEN\
+      RAISE EXCEPTION 'non-serialized item (unique_id=%) must not have serial', NEW.unique_id;\
+    END IF;\
+  END IF;\
+\
+  RETURN NEW;\
+END;\
+$$;\
+\
+DROP TRIGGER IF EXISTS trg_transfer_line_enforce_mode ON public.store_transfer_line_list;\
+CREATE TRIGGER trg_transfer_line_enforce_mode\
+BEFORE INSERT OR UPDATE ON public.store_transfer_line_list\
+FOR EACH ROW\
+EXECUTE FUNCTION public.transfer_line_enforce_mode();\
+\
+-- =========================================\
+-- \uc0\u32034 \u24341 \
+-- =========================================\
+\
+-- \uc0\u26597 \u26576 \u27425 \u35843 \u25320 \u30340 \u25152 \u26377 \u26126 \u32454 \u34892 \
+CREATE INDEX IF NOT EXISTS idx_transfer_line_transfer\
+  ON public.store_transfer_line_list (store_transfer_id);\
+\
+-- \uc0\u26597 \u26576 \u21830 \u21697 \u30340 \u35843 \u25320 \u21382 \u21490 \
+CREATE INDEX IF NOT EXISTS idx_transfer_line_unique_id\
+  ON public.store_transfer_line_list (unique_id);\
+\
+-- \uc0\u26597 \u26576 \u24207 \u21015 \u21495 \u21333 \u20214 \u30340 \u35843 \u25320 \u35760 \u24405 \
+CREATE INDEX IF NOT EXISTS idx_transfer_line_unit_id\
+  ON public.store_transfer_line_list (unit_id)\
+  WHERE unit_id IS NOT NULL;}

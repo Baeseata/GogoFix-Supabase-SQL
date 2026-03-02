@@ -1,0 +1,186 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2822
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\margl1440\margr1440\vieww11520\viewh8400\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 -- =========================================\
+-- transaction_list \uc0\u20132 \u26131 \u20027 \u34920 \u65288 v2\u65306 customer_id \u25913 \u20026  uuid\u65289 \
+-- =========================================\
+\
+-- 0) \uc0\u20132 \u26131 \u31867 \u22411 \u26522 \u20030 \
+-- =========================================\
+-- \uc0\u31867 \u22411 \u21028 \u23450 \u30001 \u23458 \u25143 \u31471 \u26681 \u25454 \u20132 \u26131 \u20869 \u23481 \u21644 \u20248 \u20808 \u32423 \u35268 \u21017 \u20915 \u23450 \u65292 \u25968 \u25454 \u24211 \u19981 \u20570 \u26657 \u39564 \
+-- \uc0\u20248 \u20808 \u32423 \u65288 \u39640 \u8594 \u20302 \u65289 \u65306 exchange > serialized > repair > sale / refund / payment\
+--   exchange   = \uc0\u36864 \u36135 \u21518 \u21448 \u25442 \u36135 \u65288 \u21482 \u35201 \u21152 \u20102 \u20219 \u20309  item\u65292 \u19981 \u31649 \u22810 \u23569 \u65292 \u37117 \u31639  exchange\u65289 \
+--   serialized = \uc0\u21253 \u21547  serialized item \u21806 \u20986 \u65288 \u20248 \u20808 \u32423 \u20165 \u27425 \u20110  exchange\u65289 \
+--   repair     = \uc0\u32500 \u20462 \u21333 \u65288 \u21482 \u26377  repair parts \u25110  repair service \u37117 \u31639  repair\u65292 UI \u26041 \u38754 \u23454 \u29616 \u65289 \
+--   sale       = \uc0\u26368 \u26222 \u36890 \u30340 \u38144 \u21806 \u20132 \u26131 \
+--   refund     = \uc0\u20165 \u36864 \u36135 \u36864 \u27454 \
+--   payment    = \uc0\u23458 \u25143 \u23545  balance \u36827 \u34892 \u21464 \u21160 \u65288 \u20805 \u20540 \u12289 \u23384 \u38065 \u12289 \u36864 \u38065 \u12289 \u23450 \u37329 \u31561 \u65292 \u24517 \u39035 \u21333 \u29420 \u19968 \u20010  transaction\u65289 \
+DO $$\
+BEGIN\
+  CREATE TYPE public.transaction_type AS ENUM (\
+    'exchange', 'serialized', 'repair', 'sale', 'refund', 'payment'\
+  );\
+EXCEPTION\
+  WHEN duplicate_object THEN NULL;\
+END $$;\
+\
+-- =========================================\
+-- 1) table\
+-- =========================================\
+CREATE TABLE IF NOT EXISTS public.transaction_list (\
+\
+  -- \uc0\u20840 \u23616 \u21807 \u19968 \u20027 \u38190 \u65292 \u30001 \u23458 \u25143 \u31471 \u29983 \u25104  UUID v7\u65292 INSERT \u26102 \u20256 \u20837 \u65292 \u19981 \u35774  DEFAULT\
+  -- \uc0\u31163 \u32447 \u26102 \u23458 \u25143 \u31471 \u33258 \u34892 \u29983 \u25104 \u65292 \u32852 \u32593 \u21518 \u21516 \u27493 \u20889 \u20837 \u65307 \u23567 \u31080 \u19978 \u20250 \u25171 \u21360 \u27492  ID \u20316 \u20026 \u21807 \u19968 \u20973 \u35777 \
+  transaction_id uuid PRIMARY KEY,\
+\
+  -- \uc0\u38376 \u24215  ID\u65292 \u22806 \u38190 \u25351 \u21521  store_list\
+  store_id text NOT NULL REFERENCES public.store_list(store_id),\
+\
+  -- \uc0\u23458 \u25143  ID\u65288 uuid\u65289 \u65292 \u22806 \u38190 \u25351 \u21521  customer_list\u65307 NULL \u34920 \u31034  walk-in \u25955 \u23458 \
+  customer_id uuid DEFAULT NULL REFERENCES public.customer_list(customer_id),\
+\
+  -- \uc0\u32463 \u25163 \u20154  ID\u65292 \u22806 \u38190 \u25351 \u21521  user_list\u65307 \u27599 \u31508 \u20132 \u26131 \u24517 \u39035 \u26377 \u32463 \u25163 \u20154 \
+  user_id integer NOT NULL REFERENCES public.user_list(user_id),\
+\
+  -- \uc0\u38376 \u24215 \u20869 \u39034 \u24207 \u23637 \u31034  ID\u65292 \u20174  1 \u24320 \u22987 \u65292 \u32852 \u32593 \u21516 \u27493 \u26102 \u30001 \u25968 \u25454 \u24211 \u20998 \u37197 \
+  -- \uc0\u31163 \u32447 \u26102 \u23458 \u25143 \u31471 \u29983 \u25104 \u20020 \u26102  ID \u29992 \u20110 \u26412 \u22320 \u23637 \u31034 \u65292 \u23454 \u38469  supabase \u19981 \u20648 \u23384 \u20020 \u26102  ID\
+  -- \uc0\u32852 \u32593 \u21516 \u27493 \u26102 \u20877 \u32479 \u19968 \u20998 \u37197 \u27491 \u24335 \u32534 \u21495 \u65292 \u22240 \u27492  INSERT \u26102 \u21487 \u33021 \u20026  NULL\
+  store_transaction_id integer DEFAULT NULL,\
+\
+  -- \uc0\u20851 \u32852 \u20132 \u26131  ID\u65306 refund / exchange \u26102 \u25351 \u21521 \u21407 \u20132 \u26131 \u30340  transaction_id\
+  -- \uc0\u19981 \u21152 \u22806 \u38190 \u32422 \u26463 \u65306 \u22240 \u20026 \u20851 \u32852 \u30340 \u21407 \u20132 \u26131 \u21487 \u33021 \u23578 \u26410 \u21516 \u27493 \u21040 \u26381 \u21153 \u31471 \u65288 \u31163 \u32447 \u22330 \u26223 \u65289 \
+  related_transaction_id uuid DEFAULT NULL,\
+\
+  -- \uc0\u20132 \u26131 \u31867 \u22411 \u65292 \u30001 \u23458 \u25143 \u31471 \u26681 \u25454 \u20248 \u20808 \u32423 \u35268 \u21017 \u21028 \u23450 \
+  type public.transaction_type NOT NULL,\
+\
+  -- \uc0\u26159 \u21542 \u34987 \u32534 \u36753 \u36807 \u65306 \u21482 \u35201 \u22312  UI \u23618 \u38754 \u26377 \u20154 \u26356 \u25913 \u20102 \u20132 \u26131 \u20449 \u24687 \u65292 \u23601 \u26631 \u35760 \u20026  true\
+  is_edited boolean NOT NULL DEFAULT false,\
+\
+  -- =========================================\
+  -- \uc0\u25903 \u20184 \u26041 \u24335 \u37329 \u39069 \u26126 \u32454 \u65288 \u22343  NOT NULL DEFAULT 0\u65289 \
+  -- =========================================\
+\
+  -- \uc0\u29616 \u37329 \
+  cash numeric(10,2) NOT NULL DEFAULT 0,\
+\
+  -- \uc0\u20449 \u29992 \u21345 \
+  credit numeric(10,2) NOT NULL DEFAULT 0,\
+\
+  -- \uc0\u20511 \u35760 \u21345 \
+  debit numeric(10,2) NOT NULL DEFAULT 0,\
+\
+  -- \uc0\u23458 \u25143 \u20174 \u33258 \u24049  balance \u37324 \u33457 \u30340 \u38065 \
+  balance numeric(10,2) NOT NULL DEFAULT 0,\
+\
+  -- =========================================\
+  -- \uc0\u27719 \u24635 \u37329 \u39069 \u65288 \u22343  NOT NULL DEFAULT 0\u65289 \
+  -- =========================================\
+\
+  -- \uc0\u20132 \u26131 \u24635 \u39069  = cash + credit + debit + balance\
+  amount_total numeric(10,2) NOT NULL DEFAULT 0,\
+\
+  -- \uc0\u31246 \u39069 \u21512 \u35745 \
+  tax_total numeric(10,2) NOT NULL DEFAULT 0,\
+\
+  -- \uc0\u25104 \u26412 \u21512 \u35745 \u65288 \u21363 \u20351 \u26159  payment \u31867 \u22411 \u65292 cost \u20063 \u20026  0\u65292 \u19981 \u20026  NULL\u65289 \
+  cost_total numeric(10,2) NOT NULL DEFAULT 0,\
+\
+  -- \uc0\u21033 \u28070  = amount_total - tax_total - cost_total\
+  profit_total numeric(10,2) NOT NULL DEFAULT 0,\
+\
+  -- =========================================\
+  -- \uc0\u22791 \u27880 \
+  -- =========================================\
+\
+  -- \uc0\u25171 \u21360 \u22312 \u23567 \u31080 \u19978 \u30340 \u22791 \u27880 \u65288 \u23458 \u25143 \u21487 \u35265 \u65289 \
+  note_on_receipt text DEFAULT NULL,\
+\
+  -- \uc0\u31995 \u32479 \u20869 \u37096 \u22791 \u27880 \u65288 \u20165 \u21592 \u24037 \u21487 \u35265 \u65292 \u19981 \u25171 \u21360 \u65289 \
+  note_on_system text DEFAULT NULL,\
+\
+  -- =========================================\
+  -- \uc0\u35774 \u22791 \u19982 \u29677 \u27425 \
+  -- =========================================\
+\
+  -- \uc0\u29677 \u27425  ID\u65288 \u21518 \u32493 \u20250 \u24314  shift \u34920 \u65292 \u23626 \u26102 \u21487 \u34917 \u22806 \u38190 \u65289 \
+  shift_id integer DEFAULT NULL,\
+\
+  -- \uc0\u35774 \u22791  ID\u65292 \u23458 \u25143 \u31471 \u39318 \u27425 \u21551 \u21160 \u26102 \u29983 \u25104 \u24182 \u27704 \u20037 \u20445 \u23384 \u65288 \u21518 \u32493 \u20250 \u24314  device \u34920 \u65292 \u23626 \u26102 \u21487 \u34917 \u22806 \u38190 \u65289 \
+  device_id text DEFAULT NULL,\
+\
+  -- =========================================\
+  -- \uc0\u26102 \u38388 \u25139 \
+  -- =========================================\
+\
+  -- \uc0\u23458 \u25143 \u31471 \u26412 \u22320 \u21019 \u24314 \u26102 \u38388 \u65288 \u31163 \u32447 \u22330 \u26223 \u19979 \u30001 \u23458 \u25143 \u31471 \u25552 \u20379 \u65289 \
+  created_at timestamptz NOT NULL,\
+\
+  -- \uc0\u39318 \u27425 \u21516 \u27493 \u21040 \u20113 \u31471 \u30340 \u26102 \u38388 \u65307 NULL \u34920 \u31034 \u23578 \u26410 \u21516 \u27493 \
+  synced_at timestamptz DEFAULT NULL,\
+\
+  -- \uc0\u26368 \u21518 \u20462 \u25913 \u26102 \u38388 \
+  updated_at timestamptz NOT NULL,\
+\
+  -- \uc0\u36719 \u21024 \u38500 \u26102 \u38388 \u25139 \
+  deleted_at timestamptz DEFAULT NULL,\
+\
+  -- =========================================\
+  -- \uc0\u20828 \u24213 \u26657 \u39564 \u65306 \u30830 \u20445 \u23458 \u25143 \u31471 \u35745 \u31639 \u27491 \u30830 \u65292 \u38450 \u27490 \u33039 \u25968 \u25454 \u20837 \u24211 \
+  -- =========================================\
+  CONSTRAINT transaction_amount_total_check\
+    CHECK (amount_total = cash + credit + debit + balance),\
+\
+  CONSTRAINT transaction_profit_total_check\
+    CHECK (profit_total = amount_total - tax_total - cost_total)\
+);\
+\
+-- =========================================\
+-- 2) store_transaction_id \uc0\u38376 \u24215 \u20869 \u21807 \u19968 \u65288 \u32852 \u32593 \u20998 \u37197 \u21518 \u29983 \u25928 \u65289 \
+-- =========================================\
+-- \uc0\u20165 \u22312  store_transaction_id \u24050 \u20998 \u37197 \u65288 \u38750  NULL\u65289 \u26102 \u21442 \u19982 \u21807 \u19968 \u24615 \u26816 \u26597 \
+CREATE UNIQUE INDEX IF NOT EXISTS uq_store_transaction_id\
+  ON public.transaction_list (store_id, store_transaction_id)\
+  WHERE store_transaction_id IS NOT NULL;\
+\
+-- =========================================\
+-- 3) updated_at \uc0\u33258 \u21160 \u32500 \u25252 \u35302 \u21457 \u22120 \
+-- =========================================\
+DROP TRIGGER IF EXISTS trg_transaction_list_updated_at ON public.transaction_list;\
+CREATE TRIGGER trg_transaction_list_updated_at\
+BEFORE UPDATE ON public.transaction_list\
+FOR EACH ROW\
+EXECUTE FUNCTION public.set_updated_at();\
+\
+-- =========================================\
+-- 4) \uc0\u32034 \u24341 \
+-- =========================================\
+\
+-- \uc0\u25353 \u38376 \u24215 \u26597 \u20132 \u26131 \u65288 \u26368 \u24120 \u35265 \u30340 \u26597 \u35810 \u22330 \u26223 \u65289 \
+CREATE INDEX IF NOT EXISTS idx_transaction_store\
+  ON public.transaction_list (store_id, created_at DESC)\
+  WHERE deleted_at IS NULL;\
+\
+-- \uc0\u25353 \u23458 \u25143 \u26597 \u20132 \u26131 \u21382 \u21490 \
+CREATE INDEX IF NOT EXISTS idx_transaction_customer\
+  ON public.transaction_list (customer_id)\
+  WHERE deleted_at IS NULL AND customer_id IS NOT NULL;\
+\
+-- \uc0\u25353 \u20132 \u26131 \u31867 \u22411 \u36807 \u28388 \
+CREATE INDEX IF NOT EXISTS idx_transaction_type\
+  ON public.transaction_list (store_id, type)\
+  WHERE deleted_at IS NULL;\
+\
+-- \uc0\u25353 \u32463 \u25163 \u20154 \u26597 \u20132 \u26131 \
+CREATE INDEX IF NOT EXISTS idx_transaction_user\
+  ON public.transaction_list (user_id)\
+  WHERE deleted_at IS NULL;\
+\
+-- \uc0\u26597 \u20851 \u32852 \u20132 \u26131 \u65288 refund / exchange \u28335 \u28304 \u65289 \
+CREATE INDEX IF NOT EXISTS idx_transaction_related\
+  ON public.transaction_list (related_transaction_id)\
+  WHERE related_transaction_id IS NOT NULL;}
