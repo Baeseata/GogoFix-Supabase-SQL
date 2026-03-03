@@ -1,3 +1,5 @@
+-- Async requirement: YES - offline POS must continue high-frequency essential operations using local snapshot; sync changes to cloud after reconnection.
+-- 异步需求：是 - POS 离线时需依赖本地快照继续高频必要操作，网络恢复后将变更同步到云端。
 -- =============================================
 -- File 13 · transaction_line_list — Transaction line item table
 -- 文件 13 · transaction_line_list — 交易明细行表

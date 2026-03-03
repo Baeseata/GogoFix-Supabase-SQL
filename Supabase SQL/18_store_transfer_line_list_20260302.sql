@@ -1,3 +1,5 @@
+-- Async requirement: NO - cloud-first table; offline local snapshot support is not required for high-frequency essential POS operations.
+-- 异步需求：否 - 该表采用云端优先，不要求离线本地快照支持高频必要 POS 操作。
 -- =============================================
 -- File 18 · store_transfer_line_list — Inter-store transfer line item table
 -- 文件 18 · store_transfer_line_list — 调拨明细行表

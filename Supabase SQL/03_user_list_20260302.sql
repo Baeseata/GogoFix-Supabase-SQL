@@ -1,3 +1,5 @@
+-- Async requirement: NO - cloud-first table; offline local snapshot support is not required for high-frequency essential POS operations.
+-- 异步需求：否 - 该表采用云端优先，不要求离线本地快照支持高频必要 POS 操作。
 -- =============================================
 -- File 03 · user_list — Employee / user master table
 -- 文件 03 · user_list — 员工/用户主表

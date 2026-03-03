@@ -15,6 +15,40 @@ GogoFix is a multi-store POS (Point of Sale) system designed for phone repair sh
 ### Offline-First Design
 The WPF client operates offline-first with local SQLite as the primary data store. Key UUIDs (transaction_id, customer_id, line_id, etc.) are generated client-side using UUID v7. Data syncs to Supabase when online. The `synced_at` field tracks sync status (NULL = not yet synced). The system must guarantee zero downtime — if Supabase is unreachable, all business operations continue via local SQLite.
 
+### Table Async Requirement (Offline Snapshot + Deferred Cloud Sync)
+Definition used in this repo:
+- **Async required = YES**: when POS is offline, this table must still support high-frequency essential operations via local SQLite snapshot; all writes are synchronized to Supabase after reconnection.
+- **Async required = NO**: this table does not need offline high-frequency write support and can remain cloud-first.
+
+Sorted by SQL filename:
+
+**YES (async required)**
+- `07_customer_list_20260302.sql`
+- `12_transaction_list_20260302.sql`
+- `13_transaction_line_list_20260302.sql`
+- `16_serialized_event_list_20260302.sql`
+- `22_repair_ticket_list_20260302.sql`
+- `23_repair_ticket_line_list_20260302.sql`
+
+**NO (async not required)**
+- `01_store_list_20260302.sql`
+- `02_user_rights_templates_20260302.sql`
+- `03_user_list_20260302.sql`
+- `04_store_user_rights_20260302.sql`
+- `05_supplier_list_20260302.sql`
+- `06_mother_inventory_list_20260302.sql`
+- `08_store_inventory_list_20260302.sql`
+- `09_store_serialized_list_20260302.sql`
+- `10_batch_list_20260302.sql`
+- `11_shift_list_20260302.sql`
+- `14_store_inventory_adjustment_list_20260302.sql`
+- `15_store_inventory_adjustment_line_list_20260302.sql`
+- `17_store_transfer_list_20260302.sql`
+- `18_store_transfer_line_list_20260302.sql`
+- `19_store_item_history_list_20260302.sql`
+- `20_purchase_order_list_20260302.sql`
+- `21_purchase_order_line_list_20260302.sql`
+
 ### Multi-Store Model
 All data is scoped by `store_id` (text, e.g., "decarie", "marcel"). Stores share a global product catalog (`mother_inventory_list`) but maintain independent inventory, transactions, and users.
 
@@ -48,7 +82,7 @@ All data is scoped by `store_id` (text, e.g., "decarie", "marcel"). Stores share
 - **`customer_list`** (file 4): Customer records with UUID v7 PK (client-generated). Phone number unique among active customers. Has `balance_total` (updated via RPC).
 
 #### 4. Transactions
-- **`transaction_list`** (file 8): Transaction headers. UUID v7 PK (client-generated). Links to store, customer, user, shift. Has payment breakdown (cash, credit, debit, balance) with CHECK constraints ensuring amount_total = sum of payments, profit_total = amount - tax - cost.
+- **`transaction_list`** (file 8): Transaction headers. UUID v7 PK (client-generated). Includes human-readable `display_no` (`{store_code}{device_no}S-{YYMMDD}-{NNN}`) for receipts while UUID remains the PK. Links to store, customer, user, shift. Has payment breakdown (cash, credit, debit, balance) with CHECK constraints ensuring amount_total = sum of payments, profit_total = amount - tax - cost.
 - **`transaction_line_list`** (file 10): Transaction line items. UUID v7 PK. Links to unique_id and optionally unit_id (for serialized). CHECK constraints validate line_total_before_tax, line_total, line_profit calculations.
 
 #### 5. Batch & Shift
@@ -66,7 +100,7 @@ All data is scoped by `store_id` (text, e.g., "decarie", "marcel"). Stores share
 - **`purchase_order_list`** + **`_line_list`** (file 16): Purchase orders from suppliers. purchase_order_id auto-increments per store. Supports serialized items (qty=1 with unit_id+serial).
 
 #### 8. Repair
-- **`repair_ticket_list`** + **`_line_list`** (file 17): Repair work orders. UUID v7 PK. Records customer device info, technician assignment, repair status lifecycle. transaction_list has `repair_ticket_id` FK for linking completed repairs to payment transactions.
+- **`repair_ticket_list`** + **`_line_list`** (file 17): Repair work orders. UUID v7 PK. Header includes human-readable `display_no` (`{store_code}{device_no}R-{YYMMDD}-{NNN}`) while UUID remains the PK. Records customer device info, technician assignment, repair status lifecycle. transaction_list has `repair_ticket_id` FK for linking completed repairs to payment transactions.
 
 ### Key Design Patterns
 1. **Soft Delete**: All major tables use `deleted_at` (NULL = active). Partial unique indexes exclude deleted rows.
