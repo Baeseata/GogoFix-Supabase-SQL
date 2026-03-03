@@ -1,3 +1,5 @@
+-- Async requirement: NO - cloud-first table; offline local snapshot support is not required for high-frequency essential POS operations.
+-- 异步需求：否 - 该表采用云端优先，不要求离线本地快照支持高频必要 POS 操作。
 -- =============================================
 -- File 19 · store_item_history_list — Aggregated inventory change history (IMMUTABLE)
 -- 文件 19 · store_item_history_list — 商品库存变动历史汇总表（不可变）

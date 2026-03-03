@@ -1,3 +1,5 @@
+-- Async requirement: NO - cloud-first table; offline local snapshot support is not required for high-frequency essential POS operations.
+-- 异步需求：否 - 该表采用云端优先，不要求离线本地快照支持高频必要 POS 操作。
 -- =============================================
 -- File 15 · store_inventory_adjustment_line_list — Inventory adjustment line item table
 -- 文件 15 · store_inventory_adjustment_line_list — 库存盘点/调整明细行表
