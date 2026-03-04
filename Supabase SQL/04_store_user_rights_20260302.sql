@@ -1,3 +1,5 @@
+-- Async requirement: NO - cloud-first table; offline local snapshot support is not required for high-frequency essential POS operations.
+-- 异步需求：否 - 该表采用云端优先，不要求离线本地快照支持高频必要 POS 操作。
 -- =============================================
 -- File 04 · store_user_rights — Store-User-Permission junction table
 -- 文件 04 · store_user_rights — 门店-用户-权限关联表

@@ -1,3 +1,5 @@
+-- Async requirement: YES - offline POS must continue high-frequency essential operations using local snapshot; sync changes to cloud after reconnection.
+-- 异步需求：是 - POS 离线时需依赖本地快照继续高频必要操作，网络恢复后将变更同步到云端。
 -- =============================================
 -- File 12 · transaction_list — Transaction header table
 -- 文件 12 · transaction_list — 交易主表
@@ -72,12 +74,16 @@ CREATE TABLE IF NOT EXISTS public.transaction_list (
   -- 经手人 ID，外键指向 user_list；每笔交易应有经手人
   user_id integer NOT NULL REFERENCES public.user_list(user_id),
 
-  -- Per-store sequential display number, assigned by server on sync
-  -- While offline, the client generates a temporary local ID (not stored in Supabase)
-  -- On sync, the server assigns the official sequential number; may be NULL before sync
-  -- 门店内顺序展示编号，联网同步时由服务端分配
-  -- 离线时客户端生成临时 ID（不存入 Supabase）
-  -- 同步时才统一分配正式编号，因此 INSERT 时可能为 NULL
+  -- Human-readable document number for receipts
+  -- Format: {store_code}{device_no}S-{YYMMDD}-{NNN} (e.g. D2S-260303-003)
+  -- NULL allowed for legacy rows / offline temp rows before server normalization
+  -- 小票可读单号
+  -- 格式：{store_code}{device_no}S-{YYMMDD}-{NNN}（例如 D2S-260303-003）
+  -- 兼容历史数据与离线临时记录：允许为 NULL
+  display_no text DEFAULT NULL,
+
+  -- Legacy per-store sequential integer (kept for backward compatibility)
+  -- 历史整型展示编号（为兼容旧逻辑保留）
   store_transaction_id integer DEFAULT NULL,
 
   -- Batch ID (filled on sync; may be NULL while offline)
@@ -200,7 +206,15 @@ CREATE TABLE IF NOT EXISTS public.transaction_list (
   -- CHECK: profit_total must equal amount_total minus tax and cost
   -- 约束：利润必须等于总额减去税和成本
   CONSTRAINT chk_transaction_list_profit_total
-    CHECK (profit_total = amount_total - tax_total - cost_total)
+    CHECK (profit_total = amount_total - tax_total - cost_total),
+
+  -- Optional format guard for display_no
+  -- 显示单号格式校验（可空）
+  CONSTRAINT chk_transaction_list_display_no_format
+    CHECK (
+      display_no IS NULL
+      OR display_no ~ '^[A-Za-z0-9]+S-[0-9]{6}-[0-9]{3}$'
+    )
 );
 
 -- =============================================
@@ -219,6 +233,33 @@ BEGIN
 EXCEPTION
   WHEN duplicate_object THEN NULL;
 END $$;
+
+-- =============================================
+-- Migration safety patch: add display_no for existing databases
+-- 迁移兼容补丁：为已存在数据库补充 display_no 列
+-- =============================================
+ALTER TABLE public.transaction_list
+  ADD COLUMN IF NOT EXISTS display_no text;
+
+DO $$
+BEGIN
+  ALTER TABLE public.transaction_list
+    ADD CONSTRAINT chk_transaction_list_display_no_format
+    CHECK (
+      display_no IS NULL
+      OR display_no ~ '^[A-Za-z0-9]+S-[0-9]{6}-[0-9]{3}$'
+    );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+-- =============================================
+-- Partial unique index: display_no must be unique within a store (active rows)
+-- 部分唯一索引：display_no 在门店内唯一（仅活跃且非空记录）
+-- =============================================
+CREATE UNIQUE INDEX IF NOT EXISTS uq_transaction_store_display_no
+  ON public.transaction_list (store_id, display_no)
+  WHERE display_no IS NOT NULL AND deleted_at IS NULL;
 
 -- =============================================
 -- Partial unique index: store_transaction_id must be unique within a store (only when assigned)

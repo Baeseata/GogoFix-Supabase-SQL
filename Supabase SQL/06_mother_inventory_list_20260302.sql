@@ -1,3 +1,5 @@
+-- Async requirement: NO - cloud-first table; offline local snapshot support is not required for high-frequency essential POS operations.
+-- 异步需求：否 - 该表采用云端优先，不要求离线本地快照支持高频必要 POS 操作。
 -- =============================================
 -- File 06 · mother_inventory_list — Global product catalog
 -- 文件 06 · mother_inventory_list — 全局商品母表
@@ -23,12 +25,12 @@
 -- >>> Referenced by trigger functions in files 08, 09, 13, 15, 18, 21 <<<
 -- >>> 被以下文件的触发器函数引用：08, 09, 13, 15, 18, 21 <<<
 --
---   service    = Service item, no inventory tracked (e.g., repair labor)
---              = 服务类商品，不记录库存（如维修人工费）
---   untracked  = Fuzzy inventory tracking using stock_bucket levels (e.g., accessories)
---              = 不精确跟踪，使用模糊库存档位（如配件类）
---   tracked    = Exact quantity tracking with qty_on_hand (e.g., cases, chargers)
---              = 精确数量跟踪（如手机壳、充电器）
+--   service    = Service items mainly include unit voucher, charging port adjustment, virus cleaning, shipping, etc.
+--              = 服务类商品主要包括：unit voucher、charging port adjustment、virus cleaning、shipping 等。
+--   untracked  = Untracked items include unpackaged data cables, plugs/adapters, phone cases, screen protectors, and misc items.
+--              = untracked 包括：无包装数据线、插头/适配器、手机壳、手机膜，以及 misc item。
+--   tracked    = Tracked items are mostly packaged goods, including power banks, car mounts, etc.
+--              = tracked 主要是绝大部分有包装的商品，包括充电宝、car mount 等。
 --   serialized = Per-unit tracking with unique serial numbers (e.g., phones with IMEI)
 --              = 序列号管理跟踪，每件唯一（如手机 IMEI）
 DO $$
@@ -78,6 +80,7 @@ END $$;
 --   1002 = assign_batch_id_per_store()           (file 10)
 --   1003 = assign_shift_id_per_store()           (file 11)
 --   1004 = assign_purchase_order_id_per_store()  (file 20)
+--   1010 = assign_demand_id_per_store()          (file 24)
 -- =============================================
 CREATE OR REPLACE FUNCTION public.assign_variant_id_per_item()
 RETURNS trigger
@@ -203,6 +206,14 @@ CREATE TABLE IF NOT EXISTS public.mother_inventory_list (
 );
 
 -- =============================================
+-- Unique index: item_name must be globally unique among active rows
+-- 唯一索引：item_name 在全局活跃记录中不可重复
+-- Note: this prevents exact same-name duplicates; different naming systems can still coexist by using different names.
+-- 说明：该约束仅禁止“同名”重复；不同命名体系（不同名称）仍可并存。
+CREATE UNIQUE INDEX IF NOT EXISTS uq_mother_item_name_active
+  ON public.mother_inventory_list (item_name)
+  WHERE deleted_at IS NULL;
+
 -- Unique index: (item_id, variant_id) must be globally unique (including soft-deleted rows)
 -- 唯一索引：(item_id, variant_id) 必须全局唯一（包含软删除行）
 -- =============================================

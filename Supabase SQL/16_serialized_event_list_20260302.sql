@@ -1,3 +1,5 @@
+-- Async requirement: YES - offline POS must continue high-frequency essential operations using local snapshot; sync changes to cloud after reconnection.
+-- 异步需求：是 - POS 离线时需依赖本地快照继续高频必要操作，网络恢复后将变更同步到云端。
 -- =============================================
 -- File 16 · serialized_event_list — Serialized item lifecycle event log
 -- 文件 16 · serialized_event_list — 序列号商品生命周期事件表
@@ -10,7 +12,7 @@
 --   (none) （无）
 -- Shared components created here / 本文件创建的共享组件:
 --   ENUM public.serialized_event_type — this table only
---   Extends ENUM public.serialized_status with 'lost' and 'wasted' values
+--   Uses ENUM public.serialized_status created in file 09
 -- =============================================
 -- Immutable audit log recording every lifecycle event for serialized items (e.g., phones).
 -- Supports offline creation: PK is a UUID v7 generated client-side.
@@ -24,25 +26,9 @@
 -- =============================================
 
 -- =============================================
--- Extend serialized_status ENUM: add 'lost' and 'wasted' values
--- 扩展 serialized_status 枚举：新增 'lost' 和 'wasted' 状态
+-- Note: serialized_status is defined in file 09 and already includes lost/wasted.
+-- 说明：serialized_status 在 09 文件中定义，且已包含 lost/wasted。
 -- =============================================
--- Original ENUM (created in 09_store_serialized_list):
---   'in_stock', 'in_transit', 'sold', 'repair', 'void'
--- Added here:
---   'lost'   = Item marked as lost / 标记为丢失
---   'wasted' = Item marked as damaged/wasted / 标记为损坏/报废
--- ALTER TYPE ... ADD VALUE IF NOT EXISTS is idempotent (safe to re-run)
--- ─────────────────────────────────────────────
--- 原枚举（09_store_serialized_list 中创建）：
---   'in_stock', 'in_transit', 'sold', 'repair', 'void'
--- 本处新增：
---   'lost'   = 丢失
---   'wasted' = 报废
--- ALTER TYPE ... ADD VALUE IF NOT EXISTS 是幂等操作（可安全重复执行）
--- =============================================
-ALTER TYPE public.serialized_status ADD VALUE IF NOT EXISTS 'lost';
-ALTER TYPE public.serialized_status ADD VALUE IF NOT EXISTS 'wasted';
 
 -- =============================================
 -- ENUM: serialized_event_type — Event types for serialized item lifecycle

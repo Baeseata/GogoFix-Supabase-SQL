@@ -1,3 +1,5 @@
+-- Async requirement: NO - cloud-first table; offline local snapshot support is not required for high-frequency essential POS operations.
+-- 异步需求：否 - 该表采用云端优先，不要求离线本地快照支持高频必要 POS 操作。
 -- =============================================
 -- File 01 · store_list — Store master table
 -- 文件 01 · store_list — 门店主表
@@ -36,6 +38,34 @@ CREATE TABLE IF NOT EXISTS public.store_list (
   -- 报表接收邮箱，用于自动发送经营报表等
   store_report_email text DEFAULT NULL,
 
+  -- Store sales policy printed on sales receipts
+  -- 门店销售政策（打印在销售小票上）
+  store_sale_policy text DEFAULT NULL,
+
+  -- Store repair policy printed on repair tickets / repair receipts
+  -- 门店维修政策（打印在维修工单/维修收据上）
+  store_repair_policy text DEFAULT NULL,
+
+  -- Store website URL
+  -- 门店网站地址
+  store_website text DEFAULT NULL,
+
+  -- Store postcode / ZIP code
+  -- 门店邮编
+  store_postcode text DEFAULT NULL,
+
+  -- Google review QR reference (recommended: URL or storage path to QR image)
+  -- Google Review 二维码引用（推荐存 URL 或二维码图片存储路径）
+  store_qr text DEFAULT NULL,
+
+  -- Text displayed before the store QR on printouts
+  -- 打印时显示在门店二维码前的一段话
+  store_qr_note_before text DEFAULT NULL,
+
+  -- Text displayed after the store QR on printouts
+  -- 打印时显示在门店二维码后的一句话
+  store_qr_note_after text DEFAULT NULL,
+
   -- Tax rate configuration stored as a JSONB object
   -- e.g. {"GST": 0.05, "QST": 0.09975}
   -- The CHECK constraint below ensures this is always a JSON object (not array, string, etc.)
@@ -57,3 +87,16 @@ CREATE TABLE IF NOT EXISTS public.store_list (
   CONSTRAINT chk_store_list_tax_rates_is_object
     CHECK (jsonb_typeof(tax_rates) = 'object')
 );
+
+
+-- =============================================
+-- Migration safety patch: add newly introduced store profile fields
+-- 迁移兼容补丁：补充新增门店信息字段
+-- =============================================
+ALTER TABLE public.store_list ADD COLUMN IF NOT EXISTS store_sale_policy text;
+ALTER TABLE public.store_list ADD COLUMN IF NOT EXISTS store_repair_policy text;
+ALTER TABLE public.store_list ADD COLUMN IF NOT EXISTS store_website text;
+ALTER TABLE public.store_list ADD COLUMN IF NOT EXISTS store_postcode text;
+ALTER TABLE public.store_list ADD COLUMN IF NOT EXISTS store_qr text;
+ALTER TABLE public.store_list ADD COLUMN IF NOT EXISTS store_qr_note_before text;
+ALTER TABLE public.store_list ADD COLUMN IF NOT EXISTS store_qr_note_after text;

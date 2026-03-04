@@ -15,10 +15,45 @@ GogoFix is a multi-store POS (Point of Sale) system designed for phone repair sh
 ### Offline-First Design
 The WPF client operates offline-first with local SQLite as the primary data store. Key UUIDs (transaction_id, customer_id, line_id, etc.) are generated client-side using UUID v7. Data syncs to Supabase when online. The `synced_at` field tracks sync status (NULL = not yet synced). The system must guarantee zero downtime — if Supabase is unreachable, all business operations continue via local SQLite.
 
+### Table Async Requirement (Offline Snapshot + Deferred Cloud Sync)
+Definition used in this repo:
+- **Async required = YES**: when POS is offline, this table must still support high-frequency essential operations via local SQLite snapshot; all writes are synchronized to Supabase after reconnection.
+- **Async required = NO**: this table does not need offline high-frequency write support and can remain cloud-first.
+
+Sorted by SQL filename:
+
+**YES (async required)**
+- `07_customer_list_20260302.sql`
+- `12_transaction_list_20260302.sql`
+- `13_transaction_line_list_20260302.sql`
+- `16_serialized_event_list_20260302.sql`
+- `22_repair_ticket_list_20260302.sql`
+- `23_repair_ticket_line_list_20260302.sql`
+
+**NO (async not required)**
+- `01_store_list_20260302.sql`
+- `02_user_rights_templates_20260302.sql`
+- `03_user_list_20260302.sql`
+- `04_store_user_rights_20260302.sql`
+- `05_supplier_list_20260302.sql`
+- `06_mother_inventory_list_20260302.sql`
+- `08_store_inventory_list_20260302.sql`
+- `09_store_serialized_list_20260302.sql`
+- `10_batch_list_20260302.sql`
+- `11_shift_list_20260302.sql`
+- `14_store_inventory_adjustment_list_20260302.sql`
+- `15_store_inventory_adjustment_line_list_20260302.sql`
+- `17_store_transfer_list_20260302.sql`
+- `18_store_transfer_line_list_20260302.sql`
+- `19_store_item_history_list_20260302.sql`
+- `20_purchase_order_list_20260302.sql`
+- `21_purchase_order_line_list_20260302.sql`
+- `24_store_demand_list_20260302.sql`
+
 ### Multi-Store Model
 All data is scoped by `store_id` (text, e.g., "decarie", "marcel"). Stores share a global product catalog (`mother_inventory_list`) but maintain independent inventory, transactions, and users.
 
-## Database Schema (17 SQL files in `Supabase SQL/`)
+## Database Schema (24 SQL files in `Supabase SQL/`)
 
 ### Core ENUM Types
 | Enum | Values | Purpose |
@@ -30,25 +65,26 @@ All data is scoped by `store_id` (text, e.g., "decarie", "marcel"). Stores share
 | `transaction_type` | exchange, serialized, repair, sale, refund, payment | Transaction classification |
 | `serialized_event_type` | purchase, sell, return, mark_as_sold, mark_as_lost, mark_as_wasted, store_transferred, transferred_accepted, repair_out, repair_in, delete, revive, serial_edit | Serialized item event log types |
 | `repair_status` | pending, completed, paid, cancelled | Repair ticket lifecycle |
+| `demand_status` | pending, processing, rejected, done | Store demand review workflow |
 
 ### Tables Overview
 
 #### 1. Product Catalog (Global)
-- **`mother_inventory_list`** (file 1): Global product catalog. Each product has `item_id` (100000-999999) + `variant_id` (auto-assigned per item_id starting from 0). `unique_id` is the true PK (auto-increment from 0). Contains item_name, category_path[], item_upc[], device_compatibility[], inventory_mode, valuation_method, default_cost, default_price, supplier_id.
+- **`mother_inventory_list`** (file 1): Global product catalog. Each product has `item_id` (100000-999999) + `variant_id` (auto-assigned per item_id starting from 0). `unique_id` is the true PK (auto-increment from 0). Contains item_name, category_path[], item_upc[], device_compatibility[], inventory_mode, valuation_method, default_cost, default_price, supplier_id. `item_name` is unique among active rows (plus client-side duplicate-name check is recommended during creation).
 
 #### 2. Store Inventory
 - **`store_inventory_list`** (file 2): Per-store inventory for service/tracked/untracked items. PK = (store_id, unique_id). `qty_on_hand` for tracked, `stock_bucket` for untracked (mutually exclusive). Cost/price inherited from mother table on INSERT.
 - **`store_serialized_list`** (file 3): Per-unit inventory for serialized items (e.g., phones with IMEI). Each row = one physical unit. `serial` is globally unique (even after deletion). Has `status` lifecycle, `attribute` (jsonb for color/capacity/etc).
 
 #### 3. People
-- **`store_list`** (file 6): Store master table. Contains tax_rates (jsonb), contact info, logo path.
+- **`store_list`** (file 6): Store master table. Contains tax_rates (jsonb), contact info, logo path, receipt/repair policy texts, website/postcode, and QR-print fields (`store_qr`, `store_qr_note_before`, `store_qr_note_after`).
 - **`user_list`** (file 7): Employee accounts with self-managed password hashing (bcrypt/argon2). Not using Supabase Auth.
 - **`user_rights_templates`** (file 5): Permission templates (can_view_report, can_edit_settings, can_edit_invoice, can_manage_user, can_adjust_inventory, is_true_user).
 - **`store_user_rights`** (file 7): Links user + store + template. PK = (user_id, store_id).
 - **`customer_list`** (file 4): Customer records with UUID v7 PK (client-generated). Phone number unique among active customers. Has `balance_total` (updated via RPC).
 
 #### 4. Transactions
-- **`transaction_list`** (file 8): Transaction headers. UUID v7 PK (client-generated). Links to store, customer, user, shift. Has payment breakdown (cash, credit, debit, balance) with CHECK constraints ensuring amount_total = sum of payments, profit_total = amount - tax - cost.
+- **`transaction_list`** (file 8): Transaction headers. UUID v7 PK (client-generated). Includes human-readable `display_no` (`{store_code}{device_no}S-{YYMMDD}-{NNN}`) for receipts while UUID remains the PK. Links to store, customer, user, shift. Has payment breakdown (cash, credit, debit, balance) with CHECK constraints ensuring amount_total = sum of payments, profit_total = amount - tax - cost.
 - **`transaction_line_list`** (file 10): Transaction line items. UUID v7 PK. Links to unique_id and optionally unit_id (for serialized). CHECK constraints validate line_total_before_tax, line_total, line_profit calculations.
 
 #### 5. Batch & Shift
@@ -66,7 +102,10 @@ All data is scoped by `store_id` (text, e.g., "decarie", "marcel"). Stores share
 - **`purchase_order_list`** + **`_line_list`** (file 16): Purchase orders from suppliers. purchase_order_id auto-increments per store. Supports serialized items (qty=1 with unit_id+serial).
 
 #### 8. Repair
-- **`repair_ticket_list`** + **`_line_list`** (file 17): Repair work orders. UUID v7 PK. Records customer device info, technician assignment, repair status lifecycle. transaction_list has `repair_ticket_id` FK for linking completed repairs to payment transactions.
+- **`repair_ticket_list`** + **`_line_list`** (file 17): Repair work orders. UUID v7 PK. Header includes human-readable `display_no` (`{store_code}{device_no}R-{YYMMDD}-{NNN}`) while UUID remains the PK. Records customer device info, technician assignment, repair status lifecycle. transaction_list has `repair_ticket_id` FK for linking completed repairs to payment transactions.
+
+#### 9. Store Demands
+- **`store_demand_list`** (file 24): Shared quick-capture demand log for all staff. Composite PK `(store_id, demand_id)` where `demand_id` auto-increments per store starting at 0. Includes `tag`, `status` (`pending/processing/rejected/done`), plain-text `content`, creator/reviewer fields, manager note, and soft delete.
 
 ### Key Design Patterns
 1. **Soft Delete**: All major tables use `deleted_at` (NULL = active). Partial unique indexes exclude deleted rows.
@@ -89,6 +128,7 @@ store_list
   +-- purchase_order_list (store_id)
   +-- store_user_rights (store_id)
   +-- repair_ticket_list (store_id)
+  +-- store_demand_list (store_id)
 
 mother_inventory_list (unique_id)
   +-- store_inventory_list (unique_id)
@@ -106,13 +146,14 @@ user_list (user_id)
   +-- transaction_list (user_id)
   +-- batch_list (opened_by/closed_by)
   +-- shift_list (user_id)
+  +-- store_demand_list (created_by/reviewed_by)
 
 supplier_list (supplier_id)
   +-- mother_inventory_list (supplier_id)
   +-- purchase_order_list (supplier_id)
 ```
 
-## File Structure (23 .sql files, one table per file)
+## File Structure (24 .sql files, one table per file)
 ```
 GogoFix/
   CLAUDE.md
@@ -142,6 +183,7 @@ GogoFix/
     21_purchase_order_line_list_20260302.sql              # purchase_order_line_list
     22_repair_ticket_list_20260302.sql                    # repair_ticket_list + repair_status ENUM + transaction_list 补丁
     23_repair_ticket_line_list_20260302.sql               # repair_ticket_line_list
+    24_store_demand_list_20260302.sql                    # store_demand_list + demand_status ENUM
 ```
 
 ## Notes for Claude
