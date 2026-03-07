@@ -1,5 +1,9 @@
+-- Last updated (America/Toronto): 2026-03-06 13:47:38 EST
+-- 最后更新时间（蒙特利尔时区）: 2026-03-06 13:47:38 EST
 -- Async requirement: NO - cloud-first table; offline local snapshot support is not required for high-frequency essential POS operations.
 -- 异步需求：否 - 该表采用云端优先，不要求离线本地快照支持高频必要 POS 操作。
+-- Offline policy: opening a new batch must be done online; offline batch opening is not allowed.
+-- 离线策略：开新 batch 必须在线进行；离线状态不允许开 batch。
 -- =============================================
 -- File 10 · batch_list — Business day batch table
 -- 文件 10 · batch_list — 营业批次表

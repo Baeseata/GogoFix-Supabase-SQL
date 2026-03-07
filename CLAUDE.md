@@ -23,37 +23,39 @@ Definition used in this repo:
 Sorted by SQL filename:
 
 **YES (async required)**
-- `07_customer_list_20260302.sql`
-- `12_transaction_list_20260302.sql`
-- `13_transaction_line_list_20260302.sql`
-- `16_serialized_event_list_20260302.sql`
-- `22_repair_ticket_list_20260302.sql`
-- `23_repair_ticket_line_list_20260302.sql`
+- `07_customer_list.sql`
+- `12_transaction_list.sql`
+- `13_transaction_line_list.sql`
+- `16_serialized_event_list.sql`
+- `22_repair_ticket_list.sql`
+- `23_repair_ticket_line_list.sql`
 
 **NO (async not required)**
-- `01_store_list_20260302.sql`
-- `02_user_rights_templates_20260302.sql`
-- `03_user_list_20260302.sql`
-- `04_store_user_rights_20260302.sql`
-- `05_supplier_list_20260302.sql`
-- `06_mother_inventory_list_20260302.sql`
-- `08_store_inventory_list_20260302.sql`
-- `09_store_serialized_list_20260302.sql`
-- `10_batch_list_20260302.sql`
-- `11_shift_list_20260302.sql`
-- `14_store_inventory_adjustment_list_20260302.sql`
-- `15_store_inventory_adjustment_line_list_20260302.sql`
-- `17_store_transfer_list_20260302.sql`
-- `18_store_transfer_line_list_20260302.sql`
-- `19_store_item_history_list_20260302.sql`
-- `20_purchase_order_list_20260302.sql`
-- `21_purchase_order_line_list_20260302.sql`
-- `24_store_demand_list_20260302.sql`
+- `01_store_list.sql`
+- `02_user_rights_templates.sql`
+- `03_user_list.sql`
+- `04_store_user_rights.sql`
+- `05_supplier_list.sql`
+- `06_mother_inventory_list.sql`
+- `08_store_inventory_list.sql`
+- `09_store_serialized_list.sql`
+- `10_batch_list.sql`
+- `11_shift_list.sql`
+- `14_store_inventory_adjustment_list.sql`
+- `15_store_inventory_adjustment_line_list.sql`
+- `17_store_transfer_list.sql`
+- `18_store_transfer_line_list.sql`
+- `19_store_item_history_list.sql`
+- `20_purchase_order_list.sql`
+- `21_purchase_order_line_list.sql`
+- `24_store_demand_list.sql`
+- `25_device_list.sql`
+- `26_sync_changes.sql`
 
 ### Multi-Store Model
 All data is scoped by `store_id` (text, e.g., "decarie", "marcel"). Stores share a global product catalog (`mother_inventory_list`) but maintain independent inventory, transactions, and users.
 
-## Database Schema (24 SQL files in `Supabase SQL/`)
+## Database Schema (26 SQL files in `Supabase SQL/`)
 
 ### Core ENUM Types
 | Enum | Values | Purpose |
@@ -66,6 +68,8 @@ All data is scoped by `store_id` (text, e.g., "decarie", "marcel"). Stores share
 | `serialized_event_type` | purchase, sell, return, mark_as_sold, mark_as_lost, mark_as_wasted, store_transferred, transferred_accepted, repair_out, repair_in, delete, revive, serial_edit | Serialized item event log types |
 | `repair_status` | pending, completed, paid, cancelled | Repair ticket lifecycle |
 | `demand_status` | pending, processing, rejected, done | Store demand review workflow |
+| `device_environment` | dev, register, amir, tech | Device runtime mode / client channel |
+| `sync_event_type` | transaction_committed, inventory_adjustment_committed, purchase_order_received, store_transfer_committed, store_transfer_received, repair_ticket_committed, customer_updated, supplier_updated, misc_updated | Business sync event classification |
 
 ### Tables Overview
 
@@ -77,7 +81,7 @@ All data is scoped by `store_id` (text, e.g., "decarie", "marcel"). Stores share
 - **`store_serialized_list`** (file 3): Per-unit inventory for serialized items (e.g., phones with IMEI). Each row = one physical unit. `serial` is globally unique (even after deletion). Has `status` lifecycle, `attribute` (jsonb for color/capacity/etc).
 
 #### 3. People
-- **`store_list`** (file 6): Store master table. Contains tax_rates (jsonb), contact info, logo path, receipt/repair policy texts, website/postcode, and QR-print fields (`store_qr`, `store_qr_note_before`, `store_qr_note_after`).
+- **`store_list`** (file 6): Store master table. Contains tax_rates (jsonb), contact info, logo path, receipt/repair policy texts, website/postcode, QR-print fields (`store_qr`, `store_qr_note_before`, `store_qr_note_after`), and `is_active` (whether the store is operationally active).
 - **`user_list`** (file 7): Employee accounts with self-managed password hashing (bcrypt/argon2). Not using Supabase Auth.
 - **`user_rights_templates`** (file 5): Permission templates (can_view_report, can_edit_settings, can_edit_invoice, can_manage_user, can_adjust_inventory, is_true_user).
 - **`store_user_rights`** (file 7): Links user + store + template. PK = (user_id, store_id).
@@ -107,11 +111,17 @@ All data is scoped by `store_id` (text, e.g., "decarie", "marcel"). Stores share
 #### 9. Store Demands
 - **`store_demand_list`** (file 24): Shared quick-capture demand log for all staff. Composite PK `(store_id, demand_id)` where `demand_id` auto-increments per store starting at 0. Includes `tag`, `status` (`pending/processing/rejected/done`), plain-text `content`, creator/reviewer fields, manager note, and soft delete.
 
+#### 10. Device Registry
+- **`device_list`** (file 25): POS terminal registry table. Stores per-device metadata (`device_id`, `terminal_no`, `device_name`, app version, last heartbeat), runtime environment (`dev/register/amir/tech`), active flag, and soft delete. `terminal_no` is unique per store among active rows.
+
+#### 11. Sync Event Log
+- **`sync_changes`** (file 26): Cloud sync event log (append-only). One completed business action writes one event row with idempotent `event_id`, optional `correlation_id`, `event_type`, `entity_ids[]`, store scope fields, and `payload_json`. Client must write business data and `sync_changes` in the same DB transaction (all succeed or all rollback).
+
 ### Key Design Patterns
 1. **Soft Delete**: All major tables use `deleted_at` (NULL = active). Partial unique indexes exclude deleted rows.
 2. **Auto-increment per scope**: `variant_id` per item_id, `batch_id`/`shift_id`/`purchase_order_id` per store_id, using `pg_advisory_xact_lock` to prevent race conditions.
 3. **Mode enforcement triggers**: INSERT/UPDATE triggers validate data consistency based on `inventory_mode` (service/tracked/untracked/serialized have different required fields).
-4. **Immutable audit logs**: `serialized_event_list` and `store_item_history_list` block UPDATE/DELETE via triggers.
+4. **Immutable audit logs**: `serialized_event_list`, `store_item_history_list`, and `sync_changes` block UPDATE/DELETE via triggers.
 5. **Client-side calculation with DB validation**: Totals computed by WPF client, validated by CHECK constraints on INSERT.
 6. **`updated_at` auto-refresh**: All mutable tables use `set_updated_at()` trigger.
 
@@ -129,6 +139,8 @@ store_list
   +-- store_user_rights (store_id)
   +-- repair_ticket_list (store_id)
   +-- store_demand_list (store_id)
+  +-- device_list (store_id)
+  +-- sync_changes (source_store_id / target_store_id)
 
 mother_inventory_list (unique_id)
   +-- store_inventory_list (unique_id)
@@ -153,37 +165,39 @@ supplier_list (supplier_id)
   +-- purchase_order_list (supplier_id)
 ```
 
-## File Structure (24 .sql files, one table per file)
+## File Structure (26 .sql files, one table per file)
 ```
 GogoFix/
   CLAUDE.md
   archive/
     sql_1/                # 原始 17 个 RTF 建表文件（2026-03-02 重构前的备份）
   Supabase SQL/
-    01_store_list_20260302.sql                            # store_list
-    02_user_rights_templates_20260302.sql                 # user_rights_templates
-    03_user_list_20260302.sql                             # user_list + set_updated_at() 共享函数
-    04_store_user_rights_20260302.sql                     # store_user_rights
-    05_supplier_list_20260302.sql                         # supplier_list
-    06_mother_inventory_list_20260302.sql                 # mother_inventory_list + inventory_mode / valuation_method ENUMs
-    07_customer_list_20260302.sql                         # customer_list
-    08_store_inventory_list_20260302.sql                  # store_inventory_list + stock_bucket ENUM
-    09_store_serialized_list_20260302.sql                 # store_serialized_list + serialized_status ENUM + block_mode_change
-    10_batch_list_20260302.sql                            # batch_list
-    11_shift_list_20260302.sql                            # shift_list
-    12_transaction_list_20260302.sql                      # transaction_list + transaction_type ENUM
-    13_transaction_line_list_20260302.sql                 # transaction_line_list
-    14_store_inventory_adjustment_list_20260302.sql       # adjustment_list
-    15_store_inventory_adjustment_line_list_20260302.sql  # adjustment_line_list
-    16_serialized_event_list_20260302.sql                 # serialized_event_list + serialized_event_type ENUM
-    17_store_transfer_list_20260302.sql                   # store_transfer_list
-    18_store_transfer_line_list_20260302.sql              # store_transfer_line_list
-    19_store_item_history_list_20260302.sql               # store_item_history_list (immutable)
-    20_purchase_order_list_20260302.sql                   # purchase_order_list
-    21_purchase_order_line_list_20260302.sql              # purchase_order_line_list
-    22_repair_ticket_list_20260302.sql                    # repair_ticket_list + repair_status ENUM + transaction_list 补丁
-    23_repair_ticket_line_list_20260302.sql               # repair_ticket_line_list
-    24_store_demand_list_20260302.sql                    # store_demand_list + demand_status ENUM
+    01_store_list.sql                            # store_list
+    02_user_rights_templates.sql                 # user_rights_templates
+    03_user_list.sql                             # user_list + set_updated_at() 共享函数
+    04_store_user_rights.sql                     # store_user_rights
+    05_supplier_list.sql                         # supplier_list
+    06_mother_inventory_list.sql                 # mother_inventory_list + inventory_mode / valuation_method ENUMs
+    07_customer_list.sql                         # customer_list
+    08_store_inventory_list.sql                  # store_inventory_list + stock_bucket ENUM
+    09_store_serialized_list.sql                 # store_serialized_list + serialized_status ENUM + block_mode_change
+    10_batch_list.sql                            # batch_list
+    11_shift_list.sql                            # shift_list
+    12_transaction_list.sql                      # transaction_list + transaction_type ENUM
+    13_transaction_line_list.sql                 # transaction_line_list
+    14_store_inventory_adjustment_list.sql       # adjustment_list
+    15_store_inventory_adjustment_line_list.sql  # adjustment_line_list
+    16_serialized_event_list.sql                 # serialized_event_list + serialized_event_type ENUM
+    17_store_transfer_list.sql                   # store_transfer_list
+    18_store_transfer_line_list.sql              # store_transfer_line_list
+    19_store_item_history_list.sql               # store_item_history_list (immutable)
+    20_purchase_order_list.sql                   # purchase_order_list
+    21_purchase_order_line_list.sql              # purchase_order_line_list
+    22_repair_ticket_list.sql                    # repair_ticket_list + repair_status ENUM + transaction_list 补丁
+    23_repair_ticket_line_list.sql               # repair_ticket_line_list
+    24_store_demand_list.sql                    # store_demand_list + demand_status ENUM
+    25_device_list.sql                          # device_list + device_environment ENUM
+    26_sync_changes.sql                         # sync_changes + sync_event_type ENUM
 ```
 
 ## Notes for Claude

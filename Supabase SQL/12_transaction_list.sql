@@ -1,3 +1,5 @@
+-- Last updated (America/Toronto): 2026-03-06 13:47:38 EST
+-- 最后更新时间（蒙特利尔时区）: 2026-03-06 13:47:38 EST
 -- Async requirement: YES - offline POS must continue high-frequency essential operations using local snapshot; sync changes to cloud after reconnection.
 -- 异步需求：是 - POS 离线时需依赖本地快照继续高频必要操作，网络恢复后将变更同步到云端。
 -- =============================================
@@ -86,13 +88,13 @@ CREATE TABLE IF NOT EXISTS public.transaction_list (
   -- 历史整型展示编号（为兼容旧逻辑保留）
   store_transaction_id integer DEFAULT NULL,
 
-  -- Batch ID (filled on sync; may be NULL while offline)
-  -- 批次 ID（联网同步时填入，离线时可能为 NULL）
-  batch_id integer DEFAULT NULL,
+  -- Batch ID (must be assigned before creating a transaction)
+  -- 批次 ID（创建交易前必须先分配）
+  batch_id integer NOT NULL,
 
-  -- Shift ID (filled on sync; may be NULL while offline)
-  -- 班次 ID（联网同步时填入，离线时可能为 NULL）
-  shift_id integer DEFAULT NULL,
+  -- Shift ID (must be assigned before creating a transaction)
+  -- 班次 ID（创建交易前必须先分配）
+  shift_id integer NOT NULL,
 
   -- Related transaction ID: for refund/exchange, points to the original transaction
   -- No FK constraint: the original transaction may not yet be synced (offline scenario)
@@ -219,10 +221,10 @@ CREATE TABLE IF NOT EXISTS public.transaction_list (
 
 -- =============================================
 -- Composite FK to shift_list (store_id, batch_id, shift_id)
--- batch_id and shift_id may be NULL when created offline (FK only validates when all columns are non-NULL)
+-- batch_id and shift_id are required to be non-NULL
 -- ─────────────────────────────────────────────
 -- 复合外键指向 shift_list (store_id, batch_id, shift_id)
--- 离线创建时 batch_id 和 shift_id 可能为 NULL（FK 仅在所有列非空时校验）
+-- batch_id 和 shift_id 为必填（不可为 NULL）
 -- =============================================
 DO $$
 BEGIN
@@ -232,6 +234,25 @@ BEGIN
     REFERENCES public.shift_list (store_id, batch_id, shift_id);
 EXCEPTION
   WHEN duplicate_object THEN NULL;
+END $$;
+
+-- =============================================
+-- Migration safety patch: enforce non-null shift linkage for existing databases
+-- 迁移兼容补丁：对已存在数据库强制 batch_id / shift_id 非空
+-- =============================================
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.transaction_list
+    WHERE batch_id IS NULL OR shift_id IS NULL
+  ) THEN
+    ALTER TABLE public.transaction_list
+      ALTER COLUMN batch_id SET NOT NULL,
+      ALTER COLUMN shift_id SET NOT NULL;
+  ELSE
+    RAISE NOTICE 'Skip SET NOT NULL on transaction_list.batch_id/shift_id because NULL rows exist.';
+  END IF;
 END $$;
 
 -- =============================================

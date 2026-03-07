@@ -1,3 +1,5 @@
+-- Last updated (America/Toronto): 2026-03-06 13:47:38 EST
+-- 最后更新时间（蒙特利尔时区）: 2026-03-06 13:47:38 EST
 -- Async requirement: NO - cloud-first table; offline local snapshot support is not required for high-frequency essential POS operations.
 -- 异步需求：否 - 该表采用云端优先，不要求离线本地快照支持高频必要 POS 操作。
 -- =========================================

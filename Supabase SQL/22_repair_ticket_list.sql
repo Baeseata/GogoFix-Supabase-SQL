@@ -1,3 +1,5 @@
+-- Last updated (America/Toronto): 2026-03-06 13:47:38 EST
+-- 最后更新时间（蒙特利尔时区）: 2026-03-06 13:47:38 EST
 -- Async requirement: YES - offline POS must continue high-frequency essential operations using local snapshot; sync changes to cloud after reconnection.
 -- 异步需求：是 - POS 离线时需依赖本地快照继续高频必要操作，网络恢复后将变更同步到云端。
 -- =========================================
@@ -59,6 +61,7 @@ CREATE TABLE IF NOT EXISTS public.repair_ticket_list (
 
   -- 设备信息
   device_name text,
+  device_id text,                                  -- 创建/跟进该工单的POS设备ID
   serial text,                                    -- 客户设备序列号，可选
   condition_before text,                          -- 修理前状况描述
   password_note text,                             -- 客户端加密后存储
@@ -84,6 +87,11 @@ CREATE TABLE IF NOT EXISTS public.repair_ticket_list (
     )
 );
 
+-- Migration safety patch: add device_id for existing databases
+-- 迁移兼容补丁：为已存在数据库补充 device_id 字段
+ALTER TABLE public.repair_ticket_list
+  ADD COLUMN IF NOT EXISTS device_id text;
+
 -- =========================================
 -- 索引
 -- =========================================
@@ -102,6 +110,11 @@ CREATE INDEX IF NOT EXISTS idx_repair_ticket_customer_created
 CREATE INDEX IF NOT EXISTS idx_repair_ticket_status
   ON public.repair_ticket_list (store_id, repair_status)
   WHERE deleted_at IS NULL;
+
+-- 按门店 + 设备查询工单（便于离线后在同设备续做）
+CREATE INDEX IF NOT EXISTS idx_repair_ticket_store_device_created
+  ON public.repair_ticket_list (store_id, device_id, created_at DESC)
+  WHERE deleted_at IS NULL AND device_id IS NOT NULL;
 
 -- display_no 唯一（同门店内，非空且未删除）
 CREATE UNIQUE INDEX IF NOT EXISTS uq_repair_ticket_store_display_no
