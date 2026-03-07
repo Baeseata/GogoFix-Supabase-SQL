@@ -1,3 +1,5 @@
+-- Last updated (America/Toronto): 2026-03-06 13:47:38 EST
+-- 最后更新时间（蒙特利尔时区）: 2026-03-06 13:47:38 EST
 -- Async requirement: NO - cloud-first table; offline local snapshot support is not required for high-frequency essential POS operations.
 -- 异步需求：否 - 该表采用云端优先，不要求离线本地快照支持高频必要 POS 操作。
 -- =============================================
@@ -78,6 +80,15 @@ CREATE TABLE IF NOT EXISTS public.store_list (
   -- 门店 Logo 图片的存储路径（如 "stores/decarie/logo.png"）
   store_logo text DEFAULT NULL,
 
+  -- Store-level visibility scope (which stores' data this store is allowed to access)
+  -- 门店级可见范围（本门店被允许访问哪些门店的数据）
+  -- Example / 示例: {'decarie','marcel'}
+  visible_store_ids text[] NOT NULL DEFAULT '{}'::text[],
+
+  -- Store activation flag: false means the store is inactive for operational workflows
+  -- 门店激活状态：false 表示门店不参与多数运营流程
+  is_active boolean NOT NULL DEFAULT true,
+
   -- Soft delete timestamp; NULL = active store, non-NULL = closed / disabled
   -- 软删除时间戳；NULL 表示正常营业，非 NULL 表示门店已关闭/停用
   deleted_at timestamptz DEFAULT NULL,
@@ -100,3 +111,10 @@ ALTER TABLE public.store_list ADD COLUMN IF NOT EXISTS store_postcode text;
 ALTER TABLE public.store_list ADD COLUMN IF NOT EXISTS store_qr text;
 ALTER TABLE public.store_list ADD COLUMN IF NOT EXISTS store_qr_note_before text;
 ALTER TABLE public.store_list ADD COLUMN IF NOT EXISTS store_qr_note_after text;
+ALTER TABLE public.store_list ADD COLUMN IF NOT EXISTS is_active boolean NOT NULL DEFAULT true;
+ALTER TABLE public.store_list ADD COLUMN IF NOT EXISTS visible_store_ids text[] NOT NULL DEFAULT '{}'::text[];
+
+-- GIN index for fast visibility membership checks
+-- GIN 索引：加速可见范围包含关系判断
+CREATE INDEX IF NOT EXISTS gin_store_list_visible_store_ids
+  ON public.store_list USING gin (visible_store_ids);

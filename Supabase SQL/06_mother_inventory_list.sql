@@ -1,3 +1,5 @@
+-- Last updated (America/Toronto): 2026-03-06 13:47:38 EST
+-- 最后更新时间（蒙特利尔时区）: 2026-03-06 13:47:38 EST
 -- Async requirement: NO - cloud-first table; offline local snapshot support is not required for high-frequency essential POS operations.
 -- 异步需求：否 - 该表采用云端优先，不要求离线本地快照支持高频必要 POS 操作。
 -- =============================================
@@ -195,6 +197,11 @@ CREATE TABLE IF NOT EXISTS public.mother_inventory_list (
   -- 创建该商品记录的门店 ID
   created_store_id text NOT NULL REFERENCES public.store_list(store_id),
 
+  -- Item-level visibility scope (which stores can view/use this item)
+  -- 商品级可见范围（哪些门店可以查看/使用该商品）
+  -- Example / 示例: {'marcel','decarie'}
+  visible_store_ids text[] NOT NULL DEFAULT '{}'::text[],
+
   -- Soft delete timestamp; NULL = active, non-NULL = removed from catalog
   -- 软删除时间戳；NULL 表示正常，非 NULL 表示已从目录中移除
   deleted_at timestamptz DEFAULT NULL,
@@ -204,6 +211,11 @@ CREATE TABLE IF NOT EXISTS public.mother_inventory_list (
   CONSTRAINT chk_mother_inventory_list_item_id_range
     CHECK (item_id BETWEEN 100000 AND 999999)
 );
+
+-- Migration safety patch: add item visibility scope for existing databases
+-- 迁移兼容补丁：为已存在数据库补充商品可见门店字段
+ALTER TABLE public.mother_inventory_list
+  ADD COLUMN IF NOT EXISTS visible_store_ids text[] NOT NULL DEFAULT '{}'::text[];
 
 -- =============================================
 -- Unique index: item_name must be globally unique among active rows
@@ -254,6 +266,11 @@ CREATE INDEX IF NOT EXISTS idx_mother_inventory_list_item_id
 -- 按库存跟踪模式筛选商品
 CREATE INDEX IF NOT EXISTS idx_mother_inventory_list_inventory_mode
   ON public.mother_inventory_list (inventory_mode);
+
+-- GIN index for item visibility scope checks
+-- GIN 索引：用于商品可见门店包含关系查询
+CREATE INDEX IF NOT EXISTS gin_mother_inventory_list_visible_store_ids
+  ON public.mother_inventory_list USING gin (visible_store_ids);
 
 -- GIN index for category_path array searches (e.g., find all products in a category)
 -- GIN 索引：用于分类路径数组搜索（如查找某分类下的所有商品）

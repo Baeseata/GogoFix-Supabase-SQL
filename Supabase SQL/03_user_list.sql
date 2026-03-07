@@ -1,3 +1,5 @@
+-- Last updated (America/Toronto): 2026-03-06 15:23:16 EST
+-- 最后更新时间（蒙特利尔时区）: 2026-03-06 15:23:16 EST
 -- Async requirement: NO - cloud-first table; offline local snapshot support is not required for high-frequency essential POS operations.
 -- 异步需求：否 - 该表采用云端优先，不要求离线本地快照支持高频必要 POS 操作。
 -- =============================================
@@ -14,7 +16,7 @@
 --   22_repair_ticket_list
 -- Shared components created here / 本文件创建的共享组件:
 --   Function public.set_updated_at() — used by ALL mutable tables in files
---   04, 05, 06, 07, 08, 09, 10, 11, 12, 17, 20, 21, 22, 23
+--   04, 05, 06, 07, 08, 09, 10, 11, 12, 17, 20, 21, 22, 23, 25
 -- =============================================
 -- Self-managed authentication system. The password field stores
 -- bcrypt/argon2 hashes; the client hashes the password before sending.
