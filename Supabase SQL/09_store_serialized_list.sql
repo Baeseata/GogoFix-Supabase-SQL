@@ -51,10 +51,10 @@ END $$;
 -- =============================================
 CREATE TABLE IF NOT EXISTS public.store_serialized_list (
 
-  -- Auto-increment PK for each physical unit; starting from 0
-  -- 每件实物的自增主键，从 0 开始
+  -- Auto-increment PK for each physical unit; starting from 1
+  -- 每件实物的自增主键，从 1 开始
   unit_id integer
-    GENERATED ALWAYS AS IDENTITY (START WITH 0 MINVALUE 0)
+    GENERATED ALWAYS AS IDENTITY (START WITH 1 MINVALUE 1)
     PRIMARY KEY,
 
   -- Store ID, FK to store_list (the store currently holding this unit)

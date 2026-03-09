@@ -209,3 +209,16 @@ GogoFix/
 - The system does NOT use Supabase Auth; authentication is self-managed via user_list.
 - Table relationships diagram has known minor inaccuracies — will be corrected as schema is finalized.
 - The SQL schema files are actively being restructured and rewritten. File list and content will evolve.
+
+
+## Local SQLite Schema
+
+A new folder `Local SQLite/` is provided alongside `Supabase SQL/`.
+
+- `Local SQLite/01_*.sql` to `Local SQLite/25_*.sql`: local executable SQLite DDL for the 25 business tables.
+- `Local SQLite/26_sync_outbox.sql`: local outbound sync queue (`pending/acted/error` status state machine).
+- `Local SQLite/27_sync_inbox.sql`: local inbound dedupe/apply log by `event_id`.
+
+Design notes:
+- PostgreSQL-specific types (`uuid`, `jsonb`, `timestamptz`, arrays, enum types) are mapped into SQLite-compatible definitions while preserving business semantics with `CHECK` constraints where needed.
+- `PRAGMA foreign_keys = ON;` is included in each local SQL file.

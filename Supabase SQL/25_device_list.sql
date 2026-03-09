@@ -70,6 +70,10 @@ CREATE TABLE IF NOT EXISTS public.device_list (
   -- 当前设备运行的客户端版本号
   app_version text DEFAULT NULL,
 
+  -- Sync checkpoint cursor (last synced cloud change_id)
+  -- 同步检查点游标（最近一次同步到的云端 change_id）
+  checkpoint bigint NOT NULL DEFAULT 0,
+
   -- Environment/mode of this device
   -- 设备运行环境/模式
   environment public.device_environment NOT NULL,

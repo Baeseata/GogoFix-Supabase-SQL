@@ -13,9 +13,9 @@
 
 CREATE TABLE IF NOT EXISTS public.purchase_order_line_list (
 
-  -- 全局自增主键，从 0 开始
+  -- 全局自增主键，从 1 开始
   purchase_order_line_id integer
-    GENERATED ALWAYS AS IDENTITY (START WITH 0 MINVALUE 0)
+    GENERATED ALWAYS AS IDENTITY (START WITH 1 MINVALUE 1)
     PRIMARY KEY,
 
   -- 门店 ID（用于复合外键指向主表）

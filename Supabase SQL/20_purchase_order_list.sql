@@ -15,7 +15,7 @@
 -- =========================================
 -- 函数: assign_purchase_order_id_per_store()
 -- =========================================
--- 同一 store_id 下，purchase_order_id 从 0 开始依次递增
+-- 同一 store_id 下，purchase_order_id 从 1 开始依次递增
 CREATE OR REPLACE FUNCTION public.assign_purchase_order_id_per_store()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -30,7 +30,7 @@ BEGIN
   -- 咨询锁：命名空间 1004，避免和其他锁冲突
   PERFORM pg_advisory_xact_lock(1004, hashtext(NEW.store_id));
 
-  SELECT COALESCE(MAX(purchase_order_id), -1) + 1
+  SELECT COALESCE(MAX(purchase_order_id), 0) + 1
     INTO next_id
   FROM public.purchase_order_list
   WHERE store_id = NEW.store_id;
@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS public.purchase_order_list (
   -- 门店 ID
   store_id text NOT NULL REFERENCES public.store_list(store_id),
 
-  -- 采购单编号，同一门店内从 0 开始自动递增，由触发器分配
+  -- 采购单编号，同一门店内从 1 开始自动递增，由触发器分配
   purchase_order_id integer NOT NULL,
 
   -- 供应商

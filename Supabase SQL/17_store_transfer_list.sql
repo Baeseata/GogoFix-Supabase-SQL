@@ -25,10 +25,10 @@
 
 CREATE TABLE IF NOT EXISTS public.store_transfer_list (
 
-  -- Auto-increment primary key, starting from 0
-  -- 全局自增主键，从 0 开始
+  -- Auto-increment primary key, starting from 1
+  -- 全局自增主键，从 1 开始
   store_transfer_id integer
-    GENERATED ALWAYS AS IDENTITY (START WITH 0 MINVALUE 0)
+    GENERATED ALWAYS AS IDENTITY (START WITH 1 MINVALUE 1)
     PRIMARY KEY,
 
   -- Source store (sender), FK to store_list

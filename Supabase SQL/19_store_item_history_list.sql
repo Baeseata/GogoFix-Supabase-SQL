@@ -27,10 +27,10 @@
 
 CREATE TABLE IF NOT EXISTS public.store_item_history_list (
 
-  -- Auto-increment primary key, starting from 0 (assigned by DB)
-  -- 全局自增主键，从 0 开始（由数据库分配）
+  -- Auto-increment primary key, starting from 1 (assigned by DB)
+  -- 全局自增主键，从 1 开始（由数据库分配）
   history_id integer
-    GENERATED ALWAYS AS IDENTITY (START WITH 0 MINVALUE 0)
+    GENERATED ALWAYS AS IDENTITY (START WITH 1 MINVALUE 1)
     PRIMARY KEY,
 
   -- Store where the inventory change occurred, FK to store_list

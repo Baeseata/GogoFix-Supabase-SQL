@@ -41,10 +41,10 @@ END $$;
 -- Function: assign_demand_id_per_store()
 -- 函数：assign_demand_id_per_store()
 -- =============================================
--- Auto-assigns demand_id per store starting from 0.
+-- Auto-assigns demand_id per store starting from 1.
 -- Uses advisory lock namespace 1010 to avoid concurrent conflicts.
 -- ─────────────────────────────────────────────
--- 按门店自动分配 demand_id，从 0 开始递增。
+-- 按门店自动分配 demand_id，从 1 开始递增。
 -- 使用咨询锁命名空间 1010 防止并发冲突。
 -- =============================================
 CREATE OR REPLACE FUNCTION public.assign_demand_id_per_store()
@@ -60,7 +60,7 @@ BEGIN
 
   PERFORM pg_advisory_xact_lock(1010, hashtext(NEW.store_id));
 
-  SELECT COALESCE(MAX(demand_id), -1) + 1
+  SELECT COALESCE(MAX(demand_id), 0) + 1
     INTO next_demand_id
   FROM public.store_demand_list
   WHERE store_id = NEW.store_id;
@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS public.store_demand_list (
   store_id text NOT NULL REFERENCES public.store_list(store_id),
 
   -- Per-store demand number, auto-assigned by trigger (starts at 0)
-  -- 门店内需求编号，由触发器自动分配（从 0 开始）
+  -- 门店内需求编号，由触发器自动分配（从 1 开始）
   demand_id integer NOT NULL,
 
   -- Demand tag/category (client-managed vocabulary)
