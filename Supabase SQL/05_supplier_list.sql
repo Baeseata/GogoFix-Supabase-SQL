@@ -15,10 +15,10 @@
 
 CREATE TABLE IF NOT EXISTS public.supplier_list (
 
-  -- Auto-increment primary key, starting from 0; should not be manually assigned
-  -- 全局自增主键，从 0 开始；业务端不应手动指定
+  -- Auto-increment primary key, starting from 1; should not be manually assigned
+  -- 全局自增主键，从 1 开始；业务端不应手动指定
   supplier_id integer
-    GENERATED ALWAYS AS IDENTITY (START WITH 0 MINVALUE 0)
+    GENERATED ALWAYS AS IDENTITY (START WITH 1 MINVALUE 1)
     PRIMARY KEY,
 
   -- Supplier name; unique among active (non-deleted) records via partial unique index below

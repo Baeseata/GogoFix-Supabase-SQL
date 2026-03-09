@@ -63,17 +63,17 @@ END $$;
 -- Function: assign_variant_id_per_item()
 -- 函数：assign_variant_id_per_item()
 -- =============================================
--- Auto-assigns variant_id per item_id (0, 1, 2, ...) on INSERT.
+-- Auto-assigns variant_id per item_id (1, 2, 3, ...) on INSERT.
 -- Uses pg_advisory_xact_lock to prevent race conditions during concurrent inserts.
 -- Note: Uses COUNT(*) as the next variant_id — if item_id already has N rows
--- (including soft-deleted), the new row gets variant_id = N.
+-- (including soft-deleted), the new row gets variant_id = N + 1.
 -- Warning: Soft-deleted rows are still counted, so gaps may appear in the sequence
 -- (e.g., variant_id=1 is soft-deleted but the number is NOT reused).
 -- ─────────────────────────────────────────────
--- 按 item_id 自动分配 variant_id（0, 1, 2, ...），在 INSERT 时触发。
+-- 按 item_id 自动分配 variant_id（1, 2, 3, ...），在 INSERT 时触发。
 -- 使用 pg_advisory_xact_lock 防止并发插入时产生重复编号。
 -- 注意：使用 COUNT(*) 作为下一个 variant_id——若该 item_id 已有 N 条记录
--- （含软删除），新记录的 variant_id = N。
+-- （含软删除），新记录的 variant_id = N + 1。
 -- 警告：软删除的记录仍会被计入，因此序列中可能出现"空洞"
 -- （例如 variant_id=1 已软删除，但序号不会被复用）。
 -- ─────────────────────────────────────────────
@@ -102,7 +102,7 @@ BEGIN
   -- 对同一 item_id 的插入串行化，使用咨询锁（命名空间 1001）
   PERFORM pg_advisory_xact_lock(1001, NEW.item_id);
 
-  SELECT COUNT(*)::int
+  SELECT COUNT(*)::int + 1
     INTO next_vid
   FROM public.mother_inventory_list
   WHERE item_id = NEW.item_id;  -- includes soft-deleted rows / 含软删除行
@@ -117,11 +117,11 @@ $$;
 -- =============================================
 CREATE TABLE IF NOT EXISTS public.mother_inventory_list (
 
-  -- Global unique PK, auto-generated IDENTITY starting from 0
+  -- Global unique PK, auto-generated IDENTITY starting from 1
   -- Business logic should NOT use this value directly as a display ID
-  -- 全局唯一主键，IDENTITY 自动生成，从 0 开始递增
+  -- 全局唯一主键，IDENTITY 自动生成，从 1 开始递增
   -- 业务端不应直接使用本值做展示 ID
-  unique_id integer GENERATED ALWAYS AS IDENTITY (START WITH 0 MINVALUE 0) PRIMARY KEY,
+  unique_id integer GENERATED ALWAYS AS IDENTITY (START WITH 1 MINVALUE 1) PRIMARY KEY,
 
   -- Product number (item_id): different variants of the same product share the same item_id
   -- Valid range: 100000–999999 (enforced by CHECK constraint below)
@@ -129,9 +129,9 @@ CREATE TABLE IF NOT EXISTS public.mother_inventory_list (
   -- 有效范围：100000–999999（由下方 CHECK 约束强制）
   item_id integer NOT NULL,
 
-  -- Variant number: auto-assigned per item_id starting from 0 (0 = default/only variant)
-  -- 规格编号：同一 item_id 下从 0 开始自动分配（0 = 默认/唯一规格）
-  variant_id integer NOT NULL DEFAULT 0,
+  -- Variant number: auto-assigned per item_id starting from 1 (1 = default/only variant)
+  -- 规格编号：同一 item_id 下从 1 开始自动分配（1 = 默认/唯一规格）
+  variant_id integer NOT NULL DEFAULT 1,
 
   -- Product barcodes (UPC): supports multiple barcodes per product; may be empty or duplicated across products
   -- 商品条码（UPC）：支持多条码绑定；允许为空，允许与其他条目重复
