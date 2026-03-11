@@ -1,5 +1,5 @@
 -- Local SQLite version of 13_transaction_line_list.sql
--- Source: Supabase SQL/13_transaction_line_list.sql
+-- Source: Supabase SQL/13_cloud_transaction_line_list.sql
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS transaction_line_list (

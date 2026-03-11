@@ -1,5 +1,5 @@
 -- Local SQLite version of 18_store_transfer_line_list.sql
--- Source: Supabase SQL/18_store_transfer_line_list.sql
+-- Source: Supabase SQL/18_cloud_store_transfer_line_list.sql
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS store_transfer_line_list (

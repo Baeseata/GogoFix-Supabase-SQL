@@ -1,5 +1,5 @@
 -- Local SQLite version of 19_store_item_history_list.sql
--- Source: Supabase SQL/19_store_item_history_list.sql
+-- Source: Supabase SQL/19_cloud_store_item_history_list.sql
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS store_item_history_list (

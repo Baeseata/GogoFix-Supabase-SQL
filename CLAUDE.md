@@ -23,34 +23,34 @@ Definition used in this repo:
 Sorted by SQL filename:
 
 **YES (async required)**
-- `07_customer_list.sql`
-- `12_transaction_list.sql`
-- `13_transaction_line_list.sql`
-- `16_serialized_event_list.sql`
-- `22_repair_ticket_list.sql`
-- `23_repair_ticket_line_list.sql`
+- `07_cloud_customer_list.sql`
+- `12_cloud_transaction_list.sql`
+- `13_cloud_transaction_line_list.sql`
+- `16_cloud_serialized_event_list.sql`
+- `22_cloud_repair_ticket_list.sql`
+- `23_cloud_repair_ticket_line_list.sql`
 
 **NO (async not required)**
-- `01_store_list.sql`
-- `02_user_rights_templates.sql`
-- `03_user_list.sql`
-- `04_store_user_rights.sql`
-- `05_supplier_list.sql`
-- `06_mother_inventory_list.sql`
-- `08_store_inventory_list.sql`
-- `09_store_serialized_list.sql`
-- `10_batch_list.sql`
-- `11_shift_list.sql`
-- `14_store_inventory_adjustment_list.sql`
-- `15_store_inventory_adjustment_line_list.sql`
-- `17_store_transfer_list.sql`
-- `18_store_transfer_line_list.sql`
-- `19_store_item_history_list.sql`
-- `20_purchase_order_list.sql`
-- `21_purchase_order_line_list.sql`
-- `24_store_demand_list.sql`
-- `25_device_list.sql`
-- `26_sync_changes.sql`
+- `01_cloud_store_list.sql`
+- `02_cloud_user_rights_templates.sql`
+- `03_cloud_user_list.sql`
+- `04_cloud_store_user_rights.sql`
+- `05_cloud_supplier_list.sql`
+- `06_cloud_mother_inventory_list.sql`
+- `08_cloud_store_inventory_list.sql`
+- `09_cloud_store_serialized_list.sql`
+- `10_cloud_batch_list.sql`
+- `11_cloud_shift_list.sql`
+- `14_cloud_store_inventory_adjustment_list.sql`
+- `15_cloud_store_inventory_adjustment_line_list.sql`
+- `17_cloud_store_transfer_list.sql`
+- `18_cloud_store_transfer_line_list.sql`
+- `19_cloud_store_item_history_list.sql`
+- `20_cloud_purchase_order_list.sql`
+- `21_cloud_purchase_order_line_list.sql`
+- `24_cloud_store_demand_list.sql`
+- `25_cloud_device_list.sql`
+- `26_cloud_sync_changes.sql`
 
 ### Multi-Store Model
 All data is scoped by `store_id` (text, e.g., "decarie", "marcel"). Stores share a global product catalog (`mother_inventory_list`) but maintain independent inventory, transactions, and users.
@@ -172,32 +172,32 @@ GogoFix/
   archive/
     sql_1/                # 原始 17 个 RTF 建表文件（2026-03-02 重构前的备份）
   Supabase SQL/
-    01_store_list.sql                            # store_list
-    02_user_rights_templates.sql                 # user_rights_templates
-    03_user_list.sql                             # user_list + set_updated_at() 共享函数
-    04_store_user_rights.sql                     # store_user_rights
-    05_supplier_list.sql                         # supplier_list
-    06_mother_inventory_list.sql                 # mother_inventory_list + inventory_mode / valuation_method ENUMs
-    07_customer_list.sql                         # customer_list
-    08_store_inventory_list.sql                  # store_inventory_list + stock_bucket ENUM
-    09_store_serialized_list.sql                 # store_serialized_list + serialized_status ENUM + block_mode_change
-    10_batch_list.sql                            # batch_list
-    11_shift_list.sql                            # shift_list
-    12_transaction_list.sql                      # transaction_list + transaction_type ENUM
-    13_transaction_line_list.sql                 # transaction_line_list
-    14_store_inventory_adjustment_list.sql       # adjustment_list
-    15_store_inventory_adjustment_line_list.sql  # adjustment_line_list
-    16_serialized_event_list.sql                 # serialized_event_list + serialized_event_type ENUM
-    17_store_transfer_list.sql                   # store_transfer_list
-    18_store_transfer_line_list.sql              # store_transfer_line_list
-    19_store_item_history_list.sql               # store_item_history_list (immutable)
-    20_purchase_order_list.sql                   # purchase_order_list
-    21_purchase_order_line_list.sql              # purchase_order_line_list
-    22_repair_ticket_list.sql                    # repair_ticket_list + repair_status ENUM + transaction_list 补丁
-    23_repair_ticket_line_list.sql               # repair_ticket_line_list
-    24_store_demand_list.sql                    # store_demand_list + demand_status ENUM
-    25_device_list.sql                          # device_list + device_environment ENUM
-    26_sync_changes.sql                         # sync_changes + sync_event_type ENUM
+    01_cloud_store_list.sql                            # store_list
+    02_cloud_user_rights_templates.sql                 # user_rights_templates
+    03_cloud_user_list.sql                             # user_list + set_updated_at() 共享函数
+    04_cloud_store_user_rights.sql                     # store_user_rights
+    05_cloud_supplier_list.sql                         # supplier_list
+    06_cloud_mother_inventory_list.sql                 # mother_inventory_list + inventory_mode / valuation_method ENUMs
+    07_cloud_customer_list.sql                         # customer_list
+    08_cloud_store_inventory_list.sql                  # store_inventory_list + stock_bucket ENUM
+    09_cloud_store_serialized_list.sql                 # store_serialized_list + serialized_status ENUM + block_mode_change
+    10_cloud_batch_list.sql                            # batch_list
+    11_cloud_shift_list.sql                            # shift_list
+    12_cloud_transaction_list.sql                      # transaction_list + transaction_type ENUM
+    13_cloud_transaction_line_list.sql                 # transaction_line_list
+    14_cloud_store_inventory_adjustment_list.sql       # adjustment_list
+    15_cloud_store_inventory_adjustment_line_list.sql  # adjustment_line_list
+    16_cloud_serialized_event_list.sql                 # serialized_event_list + serialized_event_type ENUM
+    17_cloud_store_transfer_list.sql                   # store_transfer_list
+    18_cloud_store_transfer_line_list.sql              # store_transfer_line_list
+    19_cloud_store_item_history_list.sql               # store_item_history_list (immutable)
+    20_cloud_purchase_order_list.sql                   # purchase_order_list
+    21_cloud_purchase_order_line_list.sql              # purchase_order_line_list
+    22_cloud_repair_ticket_list.sql                    # repair_ticket_list + repair_status ENUM + transaction_list 补丁
+    23_cloud_repair_ticket_line_list.sql               # repair_ticket_line_list
+    24_cloud_store_demand_list.sql                    # store_demand_list + demand_status ENUM
+    25_cloud_device_list.sql                          # device_list + device_environment ENUM
+    26_cloud_sync_changes.sql                         # sync_changes + sync_event_type ENUM
 ```
 
 ## Notes for Claude
@@ -215,10 +215,97 @@ GogoFix/
 
 A new folder `Local SQLite/` is provided alongside `Supabase SQL/`.
 
-- `Local SQLite/01_*.sql` to `Local SQLite/25_*.sql`: local executable SQLite DDL for the 25 business tables.
-- `Local SQLite/26_sync_outbox.sql`: local outbound sync queue (`pending/acted/error` status state machine).
-- `Local SQLite/27_sync_inbox.sql`: local inbound dedupe/apply log by `event_id`.
+- `Local SQLite/01_local_*.sql` to `Local SQLite/25_local_*.sql`: local executable SQLite DDL for the 25 business tables.
+- `Local SQLite/26_local_sync_outbox.sql`: local outbound sync queue (`pending/acted/error` status state machine).
+- `Local SQLite/27_local_sync_inbox.sql`: local inbound dedupe/apply log by `event_id`.
 
 Design notes:
 - PostgreSQL-specific types (`uuid`, `jsonb`, `timestamptz`, arrays, enum types) are mapped into SQLite-compatible definitions while preserving business semantics with `CHECK` constraints where needed.
 - `PRAGMA foreign_keys = ON;` is included in each local SQL file.
+
+## SQL Coding Convention (Repository)
+
+This section documents the practical conventions currently used across `Supabase SQL/` and `Local SQLite/`.
+
+- **File naming/order**: one table per file, prefixed with ordered number (`01_...sql` to `27_...sql`) to preserve dependency/read order.
+- **Header comments**: SQLite files should start with source mapping comments (e.g., `Local SQLite version of ...` and source/intent reference).
+- **Comment language**: keep SQL identifiers in English; write schema comments in **English + Chinese** pair style (English line followed by Chinese line).
+- **Column comments in DDL**: for each business-relevant column, add a short bilingual comment block immediately above the column definition.
+- **Constraint comments**: CHECK/PK/UNIQUE/INDEX definitions should include concise bilingual comments describing rule intent.
+- **Soft-delete semantics**: use `deleted_at` with `NULL = active` where soft delete applies.
+- **Timestamps**: prefer `created_at` / `updated_at` with clear behavior comments; for SQLite defaults, use `CURRENT_TIMESTAMP`.
+- **JSON fields in SQLite**: store as `text` and validate with `CHECK (json_valid(...))` whenever JSON payload correctness matters.
+- **ID/style consistency**: snake_case identifiers, explicit `NOT NULL` / `DEFAULT` declarations, and readable multi-line constraints/indexes.
+- **Compatibility-first SQL**: keep local SQLite DDL executable in SQLite (avoid PostgreSQL-only syntax in `Local SQLite/` files).
+
+## Confirmed Technical Decisions & Collaboration Constraints (Do Not Re-argue)
+
+This section consolidates confirmed decisions from the project owner. Future architecture/design/code suggestions in this repo should treat these as fixed defaults unless explicitly overridden by a new request.
+
+### 1) Desktop host is fixed: WPF + .NET
+- Main desktop runtime must be **WPF + .NET** on Windows.
+- Do **not** proactively re-recommend Electron, Tauri, pure web desktop shell, or MAUI as the main desktop host.
+- Focus rationale: long-running Windows stability, local SQLite direct access, printer/scanner/cash-drawer/camera integration, local file I/O, background sync worker robustness.
+
+### 2) UI reuse direction: WPF host + Blazor/Razor-first reusable business UI
+- Prefer this split by default:
+  - **WPF/.NET**: native shell, device integration, local services.
+  - **Blazor Hybrid / Razor components**: reusable business pages/forms/lists.
+- Future web admin backend should reuse as much business UI/model logic as practical.
+- If a feature must remain pure WPF, explain concrete technical reasons.
+
+### 3) Data architecture defaults
+- **Local DB (per store client)**: SQLite snapshot/main operational store for offline sales, inventory/repair history, serial lookup, and millisecond-level search.
+- **Center DB**: PostgreSQL (can be deployed on a Windows host machine in main store), syncing with branch-store clients.
+- Do not shift high-frequency core queries to remote API-only mode.
+- Do not place SQLite DB on network shared disk as primary runtime strategy.
+
+### 4) Attachment/photo policy
+- Large files (repair photos etc.) are not primary DB blobs.
+- Physical files live on main-store host disk; DB stores metadata/path/hash/relations.
+- Offline workflow: local file landing first, then deferred sync/upload.
+
+### 5) Sync architecture defaults (critical)
+- Offline-first is mandatory: sales/repair/counting/inventory operations must continue while disconnected.
+- Use **event/change-set driven incremental sync**, not whole-table mirror overwrite.
+- Use **Outbox / Inbox / Checkpoint** model with idempotency.
+- Sync source-of-truth ordering must not rely on client local timestamps.
+- Inventory sync should be movement/event based (sell/purchase/adjust/transfer/scrap/repair allocate-release), not just latest qty overwrite.
+
+### 6) Inventory model requirement
+- Always separate:
+  - **Precise serialized inventory** (IMEI/serial unique items).
+  - **Non-precise bulk inventory** (accessories/consumables).
+- Do not force both categories into one identical deduction model.
+
+### 7) Windows local capability priority
+- Must be designed with first-class support for:
+  - receipt printer / label printer
+  - scanner
+  - cash drawer
+  - camera & image upload
+  - local file read/write
+  - local DB maintenance
+  - background sync service
+  - stable install/update workflow
+- Keep hardware-facing logic in WPF/.NET native layer; web UI layer focuses on presentation and workflows.
+
+### 8) Mobile collaboration mode
+- No standalone mobile app is planned.
+- Default workflow:
+  - employee logs in on Windows POS,
+  - POS generates QR,
+  - phone browser scans and opens permission-scoped web workspace.
+- Mobile browser pages handle lightweight tasks (counting/photo upload/assisted input) and should share backend with future web admin.
+
+### 9) Expected future assistance output style
+When proposing next steps, prioritize implementable artifacts over abstract discussion:
+- concrete table design (SQLite + PostgreSQL)
+- module boundaries
+- sync table design (outbox/inbox/checkpoint/attachments)
+- inventory movement model
+- repair-ticket + attachment model
+- WPF + Blazor Hybrid boundary and responsibilities
+- Windows printing abstraction interfaces
+- QR login token/link flow
+- phased MVP implementation order

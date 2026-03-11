@@ -1,5 +1,5 @@
 -- Local SQLite version of 10_batch_list.sql
--- Source: Supabase SQL/10_batch_list.sql
+-- Source: Supabase SQL/10_cloud_batch_list.sql
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS batch_list (

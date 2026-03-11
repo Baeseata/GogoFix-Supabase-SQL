@@ -1,5 +1,5 @@
 -- Local SQLite version of 03_user_list.sql
--- Source: Supabase SQL/03_user_list.sql
+-- Source: Supabase SQL/03_cloud_user_list.sql
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS user_list (

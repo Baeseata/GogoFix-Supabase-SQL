@@ -1,5 +1,5 @@
 -- Local SQLite version of 25_device_list.sql
--- Source: Supabase SQL/25_device_list.sql
+-- Source: Supabase SQL/25_cloud_device_list.sql
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS device_list (

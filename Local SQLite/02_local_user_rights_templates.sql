@@ -1,5 +1,5 @@
 -- Local SQLite version of 02_user_rights_templates.sql
--- Source: Supabase SQL/02_user_rights_templates.sql
+-- Source: Supabase SQL/02_cloud_user_rights_templates.sql
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS user_rights_templates (

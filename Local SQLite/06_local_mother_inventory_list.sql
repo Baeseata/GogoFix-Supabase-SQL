@@ -1,5 +1,5 @@
 -- Local SQLite version of 06_mother_inventory_list.sql
--- Source: Supabase SQL/06_mother_inventory_list.sql
+-- Source: Supabase SQL/06_cloud_mother_inventory_list.sql
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS mother_inventory_list (

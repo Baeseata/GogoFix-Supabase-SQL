@@ -1,5 +1,5 @@
 -- Local SQLite version of 04_store_user_rights.sql
--- Source: Supabase SQL/04_store_user_rights.sql
+-- Source: Supabase SQL/04_cloud_store_user_rights.sql
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS store_user_rights (
