@@ -1,5 +1,5 @@
 -- Local SQLite version of 09_store_serialized_list.sql
--- Source: Supabase SQL/09_store_serialized_list.sql
+-- Source: Supabase SQL/09_cloud_store_serialized_list.sql
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS store_serialized_list (

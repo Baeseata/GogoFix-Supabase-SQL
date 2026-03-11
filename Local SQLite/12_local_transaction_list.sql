@@ -1,5 +1,5 @@
 -- Local SQLite version of 12_transaction_list.sql
--- Source: Supabase SQL/12_transaction_list.sql
+-- Source: Supabase SQL/12_cloud_transaction_list.sql
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS transaction_list (

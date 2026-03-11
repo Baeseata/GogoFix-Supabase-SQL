@@ -1,5 +1,5 @@
 -- Local SQLite version of 20_purchase_order_list.sql
--- Source: Supabase SQL/20_purchase_order_list.sql
+-- Source: Supabase SQL/20_cloud_purchase_order_list.sql
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS purchase_order_list (

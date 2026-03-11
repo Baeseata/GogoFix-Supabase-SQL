@@ -1,5 +1,5 @@
 -- Local SQLite version of 16_serialized_event_list.sql
--- Source: Supabase SQL/16_serialized_event_list.sql
+-- Source: Supabase SQL/16_cloud_serialized_event_list.sql
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS serialized_event_list (

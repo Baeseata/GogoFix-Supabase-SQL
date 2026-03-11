@@ -1,5 +1,5 @@
 -- Local SQLite version of 01_store_list.sql
--- Source: Supabase SQL/01_store_list.sql
+-- Source: Supabase SQL/01_cloud_store_list.sql
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS store_list (

@@ -1,5 +1,5 @@
 -- Local SQLite version of 15_store_inventory_adjustment_line_list.sql
--- Source: Supabase SQL/15_store_inventory_adjustment_line_list.sql
+-- Source: Supabase SQL/15_cloud_store_inventory_adjustment_line_list.sql
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS store_inventory_adjustment_line_list (

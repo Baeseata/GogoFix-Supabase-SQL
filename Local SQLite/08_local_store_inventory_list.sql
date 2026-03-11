@@ -1,5 +1,5 @@
 -- Local SQLite version of 08_store_inventory_list.sql
--- Source: Supabase SQL/08_store_inventory_list.sql
+-- Source: Supabase SQL/08_cloud_store_inventory_list.sql
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS store_inventory_list (

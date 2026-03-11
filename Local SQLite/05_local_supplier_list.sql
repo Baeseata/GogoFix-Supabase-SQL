@@ -1,5 +1,5 @@
 -- Local SQLite version of 05_supplier_list.sql
--- Source: Supabase SQL/05_supplier_list.sql
+-- Source: Supabase SQL/05_cloud_supplier_list.sql
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS supplier_list (

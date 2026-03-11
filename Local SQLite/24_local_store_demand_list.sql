@@ -1,5 +1,5 @@
 -- Local SQLite version of 24_store_demand_list.sql
--- Source: Supabase SQL/24_store_demand_list.sql
+-- Source: Supabase SQL/24_cloud_store_demand_list.sql
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS store_demand_list (

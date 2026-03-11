@@ -1,5 +1,5 @@
 -- Local SQLite version of 17_store_transfer_list.sql
--- Source: Supabase SQL/17_store_transfer_list.sql
+-- Source: Supabase SQL/17_cloud_store_transfer_list.sql
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS store_transfer_list (

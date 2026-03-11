@@ -1,5 +1,5 @@
 -- Local SQLite version of 23_repair_ticket_line_list.sql
--- Source: Supabase SQL/23_repair_ticket_line_list.sql
+-- Source: Supabase SQL/23_cloud_repair_ticket_line_list.sql
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS repair_ticket_line_list (

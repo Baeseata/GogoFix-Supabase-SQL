@@ -1,5 +1,5 @@
 -- Local SQLite version of 07_customer_list.sql
--- Source: Supabase SQL/07_customer_list.sql
+-- Source: Supabase SQL/07_cloud_customer_list.sql
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS customer_list (

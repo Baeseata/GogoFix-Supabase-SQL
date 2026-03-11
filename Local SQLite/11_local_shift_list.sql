@@ -1,5 +1,5 @@
 -- Local SQLite version of 11_shift_list.sql
--- Source: Supabase SQL/11_shift_list.sql
+-- Source: Supabase SQL/11_cloud_shift_list.sql
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS shift_list (
