@@ -329,8 +329,8 @@ Level 1: Raw Export        →  Level 2: Standardized CSV    →  Level 3: Datab
 (CellSmart / CellPoint       (unified format, locally         (local SQLite +
  native export format)         stored, human-readable)          cloud Supabase)
 ```
-- **Level 1 → Level 2**: Manual/scripted conversion. Raw exports vary by POS system (different column names, date formats, quirks like scientific notation IMEI corruption or date prefix errors). Each raw export is cleaned, validated, and converted into the standard CSV format.
-- **Level 2 → Level 3**: DataOps import tool loads CSVs into a dedicated `historical_transaction_line` table in both local SQLite and cloud Supabase. Both DataOps and POS can query this historical data.
+- **Level 1 → Level 2 (Rinse & Merge)**: DataOps Import/Export → "Rinse & Merge" tab. User selects store (decarie/marcel/parcex), POS source (CellSmart/CellPoint), raw CSV, and optional target CSV. Parses raw format, fixes date bugs (e.g. "20" prefix), normalizes columns, deduplicates, and outputs standardized Level 2 CSV. Supports skip/replace on duplicates, and replace-file/create-new output modes. File naming is automatic: `{store}_{YYYYMMDD}_{YYYYMMDD}.csv`.
+- **Level 2 → Level 3 (Sync to DB)**: DataOps Import/Export → "Sync to DB" tab. User selects Level 2 CSV, store, POS source. Validates all data first (fail-fast on any bad row), then batch-inserts into `historical_transaction_line` in local SQLite. Supports skip/replace on duplicates. Cloud DB sync button is stubbed (Supabase not yet connected).
 - **Level 2 files are kept** as local archive — CSV is human-readable and serves as a backup/audit trail.
 
 ### Standard CSV Format (Level 2)
@@ -366,7 +366,9 @@ ID, Time, Customer, Phone Number, Product Name, Invoice Type, IMIE Number, Rep N
 - [x] `source_pos` column tracks origin system ("cellsmart", "cellpoint", "gogofix")
 - [x] Dedup via UNIQUE constraint on `(store_id, source_id, transaction_time, product_name)`
 - [x] `row_id` auto-increment surrogate PK (source IDs not unique across stores)
-- [ ] DataOps import tool: CSV → `historical_transaction_line` with validation
+- [x] DataOps Rinse & Merge: raw CSV → Level 2 CSV (CellSmart + CellPoint parsers, date fixing, dedup)
+- [x] DataOps Sync to Local DB: Level 2 CSV → `historical_transaction_line` (validation, batch insert, dedup)
+- [ ] DataOps Sync to Cloud DB: waiting on Supabase connection setup
 - [ ] DataOps / POS query UI for historical data browsing
 
 ### Raw Data Samples (Level 1 formats)
