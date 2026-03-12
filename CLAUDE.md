@@ -309,3 +309,404 @@ When proposing next steps, prioritize implementable artifacts over abstract disc
 - Windows printing abstraction interfaces
 - QR login token/link flow
 - phased MVP implementation order
+
+## Development TODO / Roadmap
+
+Target: usable DataOps by ~mid April 2026, POS MVP trial in-store by ~May 2026.
+
+Runtime: .NET 10, WPF desktop, Visual Studio. Current status: VS projects created (GogoFix.Core, GogoFix.DataOps, GogoFix), SQL schemas done, C# code just scaffolded.
+
+**Key technical decisions:**
+- **ORM**: raw SQL schema creation (execute .sql files) + Dapper for query/mapping. NOT using EF Core.
+- **NuGet packages (Core)**: `Microsoft.Data.Sqlite`, `Dapper`, `Supabase` (supabase-csharp), `Serilog` + `Serilog.Sinks.File`, `System.Text.Json`
+- **NuGet packages (DataOps)**: `CommunityToolkit.Mvvm` (MVVM helpers), `ICSharpCode.AvalonEdit` (SQL editor syntax highlighting)
+
+---
+
+### Phase 0: GogoFix.Core — Foundation Layer
+> Core is the shared library that both DataOps and POS depend on. Must be solid before anything else.
+> Confirmed: remove EF Core from POS project, move all DB logic to Core, both apps reference Core.
+
+#### 0.1 Project setup & NuGet
+- [ ] Add NuGet packages to GogoFix.Core.csproj:
+  - `Microsoft.Data.Sqlite` — SQLite connection & commands
+  - `Dapper` — lightweight object mapping
+  - `Supabase` (supabase-csharp) — Supabase REST client
+  - `Serilog` + `Serilog.Sinks.File` — structured logging
+  - `BCrypt.Net-Next` — password hashing (for auth)
+- [ ] Remove EF Core packages from GogoFix.csproj, delete Migrations/ folder and old LocalDbContext
+- [ ] Add `GogoFix.Core` project reference to GogoFix.DataOps.csproj (already done for GogoFix.csproj)
+
+#### 0.2 Configuration system
+> File: `GogoFix.Core/Configuration/AppConfig.cs`
+
+- [ ] `AppConfig` class — deserialized from `appsettings.json` (per-app, per-device)
+  ```
+  GogoFix.Core/
+    Configuration/
+      AppConfig.cs          # root config model
+      StoreConfig.cs        # store_id, store_name, tax rates
+      DeviceConfig.cs       # device_id, terminal_no, environment (dev/register/amir/tech)
+      SupabaseConfig.cs     # Url, AnonKey, ServiceKey
+      PathConfig.cs         # SqliteDbPath, SqlSchemaDir, LogDir, AttachmentDir
+      ConfigLoader.cs       # load/save JSON config, merge defaults
+  ```
+- [ ] Config file location: `%LocalAppData%/GogoFix/appsettings.json`
+- [ ] DataOps and POS each have their own `appsettings.json` but share the same schema
+
+#### 0.3 SQLite data access layer
+> Files: `GogoFix.Core/Database/Sqlite/`
+
+- [ ] **`SqliteConnectionManager.cs`**
+  - `GetConnection(string? dbPath = null)` → returns open `SqliteConnection`
+  - Connection string: `Data Source={path};Mode=ReadWriteCreate;`
+  - Always execute `PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;` on open
+  - Singleton pattern per db file path (connection pooling via dictionary)
+- [ ] **`SqliteSchemaInitializer.cs`**
+  - `InitializeAsync(SqliteConnection conn, string sqlSchemaDir)` → reads all `Local SQLite/*.sql` files in order (01→27), executes each
+  - `GetSchemaVersion(SqliteConnection conn)` → read from a `_schema_meta` table (to be created)
+  - `IsInitialized(SqliteConnection conn)` → check if tables exist
+  - Creates a `_schema_meta` table: `(key TEXT PK, value TEXT)` to store schema_version, initialized_at
+- [ ] **`SqliteQueryHelper.cs`** (thin Dapper wrapper)
+  - `QueryAsync<T>(string sql, object? param)` → Dapper query
+  - `QueryFirstOrDefaultAsync<T>(string sql, object? param)`
+  - `ExecuteAsync(string sql, object? param)` → INSERT/UPDATE/DELETE
+  - `ExecuteInTransactionAsync(Func<SqliteConnection, SqliteTransaction, Task> action)` — critical for outbox pattern (business write + outbox write in one transaction)
+  - All methods accept optional `SqliteConnection` to allow transaction reuse
+
+#### 0.4 Supabase data access layer
+> Files: `GogoFix.Core/Database/Supabase/`
+
+- [ ] **`SupabaseClientManager.cs`**
+  - `Initialize(SupabaseConfig config)` → create and cache `Supabase.Client`
+  - `GetClient()` → return cached client (throw if not initialized)
+  - `IsConnected()` → lightweight connectivity check (ping or simple query)
+- [ ] **`SupabaseQueryHelper.cs`**
+  - `SelectAsync<T>(string table, string? filter, string? order, int? limit)`
+  - `InsertAsync<T>(string table, T row)`
+  - `UpsertAsync<T>(string table, T row)`
+  - `UpdateAsync(string table, object values, string filter)`
+  - `DeleteAsync(string table, string filter)` — soft delete only (set deleted_at)
+  - `RpcAsync<T>(string functionName, object? param)` — for stored procedures
+  - All methods return `Result<T>` wrapper (success/error/offline)
+- [ ] **`SupabaseRawSqlExecutor.cs`** (for DataOps)
+  - `ExecuteSqlAsync(string sql)` → execute arbitrary SQL via Supabase SQL API (pg_net or management API)
+  - Used by DataOps to push schema files to cloud
+
+#### 0.5 Data models & enums
+> Files: `GogoFix.Core/Models/`
+
+- [ ] **Enum definitions** — `GogoFix.Core/Models/Enums/`
+  ```
+  InventoryMode.cs        # Service, Untracked, Tracked, Serialized
+  ValuationMethod.cs      # Average, Rate, Fixed
+  StockBucket.cs          # Empty, VeryFew, Few, Normal, TooMuch
+  SerializedStatus.cs     # InStock, InTransit, Sold, Repair, Lost, Wasted, Void
+  TransactionType.cs      # Exchange, Serialized, Repair, Sale, Refund, Payment
+  SerializedEventType.cs  # Purchase, Sell, Return, MarkAsSold, ... (13 values)
+  RepairStatus.cs         # Pending, Completed, Paid, Cancelled
+  DemandStatus.cs         # Pending, Processing, Rejected, Done
+  DeviceEnvironment.cs    # Dev, Register, Amir, Tech
+  SyncEventType.cs        # TransactionCommitted, ... (9 values)
+  SyncOutboxStatus.cs     # Pending, Acted, Error
+  ```
+- [ ] **Entity classes** — `GogoFix.Core/Models/Entities/` (one class per table, 27 files)
+  - Priority order (needed first for DataOps): StoreList, MotherInventoryList, SupplierList, UserList, CustomerList, SyncOutbox, SyncInbox
+  - Each class: properties matching SQL columns, snake_case column name attributes for Dapper
+  - Use `[Column("column_name")]` attribute or Dapper `DefaultTypeMap` for snake_case mapping
+  - Nullable types where SQL allows NULL
+- [ ] **`DapperTypeHandlers.cs`** — custom type handlers for:
+  - `string[]` ↔ JSON text (SQLite stores arrays as JSON text)
+  - Enum ↔ string mapping
+  - `DateTime` ↔ SQLite text timestamp
+
+#### 0.6 Sync engine (Outbox/Inbox) — basic framework
+> Files: `GogoFix.Core/Sync/`
+> Note: full sync logic is complex. Phase 0 builds the framework; Phase 1 DataOps will test it; Phase 2 POS will use it in production.
+
+- [ ] **`SyncOutboxWriter.cs`**
+  - `EnqueueAsync(SqliteConnection conn, SqliteTransaction tx, SyncOutbox item)` — write to sync_outbox within caller's transaction
+  - Called by business logic after writing business data
+- [ ] **`SyncOutboxSender.cs`**
+  - `ProcessPendingAsync()` — query pending outbox rows, push each to Supabase `sync_changes` table
+  - On success: update status → `acted`, set `acted_at`
+  - On failure: update status → `error`, increment retry, set `last_error`
+  - Idempotent: uses `event_id` as unique key in cloud
+- [ ] **`SyncInboxPoller.cs`**
+  - `PollAsync()` — query Supabase `sync_changes` WHERE `change_id > last_checkpoint`
+  - Store checkpoint in local `_schema_meta` table (key: `sync_inbox_checkpoint`)
+  - Returns list of new change events
+- [ ] **`SyncInboxApplier.cs`** (stub for now — full logic per event_type comes in Phase 2)
+  - `ApplyAsync(SyncInbox item)` — dispatch by event_type, apply to local SQLite
+  - Dedup: skip if event_id already exists in sync_inbox
+  - Record applied_at timestamp
+- [ ] **`SyncBackgroundService.cs`**
+  - Timer-based loop (configurable interval, default 30s)
+  - Run `SyncOutboxSender.ProcessPendingAsync()` then `SyncInboxPoller.PollAsync()` + apply
+  - Graceful start/stop, error isolation (one failure doesn't kill the loop)
+  - Status property: `Idle / Syncing / Error / Offline`
+
+#### 0.7 Logging
+> File: `GogoFix.Core/Logging/LogSetup.cs`
+
+- [ ] Serilog initialization: file sink to `%LocalAppData%/GogoFix/logs/gogofix-{Date}.log`
+- [ ] Log rotation: 1 file per day, retain 30 days
+- [ ] Global static `Log.Information()` / `Log.Error()` pattern
+- [ ] All DB operations and sync events logged at Debug/Information level
+
+---
+
+### Phase 1: GogoFix.DataOps — DB Management Tool (Detailed)
+> WPF desktop app for database management, data browsing, import/export, sync testing, and SQL querying.
+> Architecture: MVVM with CommunityToolkit.Mvvm, single-window with tab-based layout.
+
+#### 1.0 App shell & navigation
+> Files: `GogoFix.DataOps/`
+
+- [ ] **MainWindow.xaml** — left sidebar nav + right content area (tab or page switching)
+  - Sidebar buttons: DB Management, Data Browser, Import/Export, Sync Monitor, Query Console
+  - Status bar: SQLite path, connection status (local/cloud), sync status
+- [ ] **App.xaml.cs** — startup: load config, init SQLite connection, init Serilog, init Supabase client
+- [ ] MVVM setup: `ViewModels/` folder, base `ObservableObject` from CommunityToolkit
+- [ ] NuGet: add `CommunityToolkit.Mvvm`, `ICSharpCode.AvalonEdit` to DataOps.csproj
+
+#### 1.1 Database creation & schema management
+> Files: `GogoFix.DataOps/Views/DbManagementPage.xaml` + `ViewModels/DbManagementViewModel.cs`
+
+- [ ] **SQLite panel:**
+  - "Select DB File" button — file picker to choose/create .db file path
+  - "Create / Rebuild DB" button → calls `SqliteSchemaInitializer.InitializeAsync()`, shows progress (27 files, progress bar)
+  - "Drop All Tables" button (with ⚠ confirmation dialog)
+  - Display: current DB path, schema version, table count, file size
+  - Table list with row counts
+- [ ] **Supabase panel:**
+  - Connection config inputs (URL, anon key, service key) — save to appsettings.json
+  - "Test Connection" button → `SupabaseClientManager.IsConnected()`
+  - "View Cloud Schema" → list tables via Supabase, show table names + row counts
+  - "Execute SQL File" → pick a `Supabase SQL/*.sql` file, push to Supabase (via raw SQL execution)
+  - "Execute All SQL Files" → batch execute all 26 files in order, progress bar
+
+#### 1.2 Data browser & CRUD
+> Files: `GogoFix.DataOps/Views/DataBrowserPage.xaml` + `ViewModels/DataBrowserViewModel.cs`
+
+- [ ] **Left panel: table list**
+  - TreeView: "Local SQLite" and "Supabase Cloud" as root nodes, tables as children
+  - Click table → load data in right panel
+  - Show row count badge per table
+- [ ] **Right panel: data grid**
+  - `DataGrid` with auto-generated columns from query result
+  - Pagination controls (page size selector: 50/100/500, prev/next)
+  - Column header click → sort ASC/DESC
+  - Filter row: text input per column → WHERE LIKE filter
+- [ ] **CRUD operations:**
+  - "Add Row" button → empty row in grid, fill in values, click Save
+  - Double-click cell → inline edit, click Save to commit UPDATE
+  - "Delete Row" button → soft delete (set deleted_at) with confirmation
+  - "Hard Delete" option (for testing/cleanup) with double confirmation
+- [ ] **JSON field handling:**
+  - Detect columns containing JSON (by name convention: `*_json`, `attribute`, `payload_json`, or `CHECK json_valid` columns)
+  - Click JSON cell → popup JSON editor with syntax highlighting + validation
+  - Format/minify toggle
+
+#### 1.3 Import / Export
+> Files: `GogoFix.DataOps/Views/ImportExportPage.xaml` + `ViewModels/ImportExportViewModel.cs`
+
+- [ ] **CSV Export:**
+  - Select source: table name or custom SQL query
+  - Select target: file save dialog (.csv)
+  - Options: delimiter (comma/tab/semicolon), include headers, encoding (UTF-8/UTF-8 BOM)
+  - Progress bar for large exports
+- [ ] **CSV Import:**
+  - Select source CSV file
+  - Select target SQLite table
+  - Column mapping UI: auto-match by header name, manual override dropdown
+  - Preview first 10 rows before import
+  - Options: skip errors / abort on error, batch size
+  - Import progress + result summary (inserted, skipped, errors)
+- [ ] **JSON Export/Import:**
+  - Export: table → JSON array file (one file per table or all tables in one)
+  - Import: JSON file → table (same mapping UI as CSV)
+- [ ] **Test data seeding:**
+  - "Seed Store" button → insert sample data for one store:
+    - 3 stores (decarie, marcel, store3)
+    - 5 users with different permission templates
+    - 50 products across categories (phones, accessories, services, misc)
+    - 10 suppliers
+    - 20 customers
+    - Sample serialized items (10 phones with IMEI)
+  - Uses realistic French/English data (Montreal-area addresses, common phone brands)
+
+#### 1.4 Sync testing & debugging
+> Files: `GogoFix.DataOps/Views/SyncMonitorPage.xaml` + `ViewModels/SyncMonitorViewModel.cs`
+
+- [ ] **Outbox panel:**
+  - DataGrid: list sync_outbox rows (event_id, event_type, status, created_at, last_error)
+  - Filter by status (pending/acted/error)
+  - "Push All Pending" button → manually trigger `SyncOutboxSender.ProcessPendingAsync()`
+  - "Retry Errors" button → reset error rows to pending, re-push
+  - "View Payload" → JSON popup for selected row
+- [ ] **Inbox panel:**
+  - DataGrid: list sync_inbox rows (event_id, change_id, event_type, applied_at)
+  - "Pull from Cloud" button → manually trigger `SyncInboxPoller.PollAsync()`
+  - "Apply Pending" button → apply un-applied inbox items
+  - Current checkpoint display (last change_id processed)
+- [ ] **Sync status:**
+  - Live indicator: Online/Offline/Syncing/Error
+  - Last sync timestamp
+  - Pending outbox count, unapplied inbox count
+  - "Start Auto-Sync" / "Stop Auto-Sync" toggle (starts `SyncBackgroundService`)
+
+#### 1.5 Data migration & cleanup utilities
+> Files: `GogoFix.DataOps/Views/MigrationPage.xaml` + `ViewModels/MigrationViewModel.cs`
+
+- [ ] **FK integrity check:**
+  - Scan all foreign key relationships, report orphaned rows
+  - Option to delete orphaned rows or list them for manual review
+- [ ] **Store data clone:**
+  - Select source store_id → clone all store-scoped data with new store_id
+  - Useful for creating test environments
+- [ ] **Bulk operations:**
+  - "Clear All Data" (truncate all tables, keep schema) with confirmation
+  - "Reset Sync State" (clear outbox + inbox + checkpoint)
+  - "Recount Row Totals" (recalculate cached counts if any)
+
+#### 1.6 Query console
+> Files: `GogoFix.DataOps/Views/QueryConsolePage.xaml` + `ViewModels/QueryConsoleViewModel.cs`
+
+- [ ] **SQL editor:**
+  - AvalonEdit-based editor with SQL syntax highlighting
+  - Target selector: "Local SQLite" or "Supabase Cloud" dropdown
+  - "Execute" button (or Ctrl+Enter) → run query
+  - "Execute Selected" → run highlighted portion only
+- [ ] **Results panel:**
+  - DataGrid for SELECT results (same as Data Browser grid)
+  - Text output for non-SELECT (rows affected, execution time)
+  - Error display with line number highlighting
+- [ ] **Query management:**
+  - Query history (last 50 queries, stored in appsettings.json or separate file)
+  - "Save Query" → name + SQL, stored locally
+  - "Load Query" → pick from saved list
+  - Preset queries dropdown: common useful queries (e.g., "active products by store", "recent transactions", "sync status summary")
+
+---
+
+### Phase 2: GogoFix POS — MVP Core
+> Minimum viable POS for in-store trial: open shift → sell → print receipt → close shift.
+
+- [ ] **2.1 Login & session**
+  - User login screen (local SQLite auth, offline-capable)
+  - Store selection (multi-store user support)
+  - Device registration (device_list)
+- [ ] **2.2 Shift management**
+  - Open batch / open shift (with opening cash amount)
+  - Close shift (closing cash, cash variance calculation)
+  - Close batch (end of day)
+  - Shift summary report
+- [ ] **2.3 Product lookup**
+  - Search by item_name, UPC barcode, category
+  - Scanner input support (barcode gun → search field)
+  - Product detail view (price, cost, stock level, variants)
+  - Serialized item lookup by serial/IMEI
+- [ ] **2.4 Sales transaction flow**
+  - Add items to cart (tracked, untracked, serialized, service)
+  - Quantity adjustment, line discount, line removal
+  - Customer attach (search/create customer)
+  - Payment screen (cash, credit, debit, balance — split payment)
+  - Transaction total / tax / profit auto-calculation (with CHECK constraint validation)
+  - Commit transaction → write transaction_list + transaction_line_list + inventory deduction
+  - Generate display_no (human-readable receipt number)
+- [ ] **2.5 Receipt printing**
+  - Receipt template (store header, items, totals, tax breakdown, footer)
+  - ESC/POS thermal printer integration
+  - Cash drawer open command on cash payment
+  - Reprint receipt from transaction history
+- [ ] **2.6 Basic inventory view (read-only in MVP)**
+  - Store inventory list (stock levels per item)
+  - Low stock alerts
+  - Serialized item list with status
+
+---
+
+### Phase 3: POS — Extended Features
+> After MVP is stable in-store, add remaining business modules.
+
+- [ ] **3.1 Inventory adjustment**
+  - Manual stock count / adjustment (tracked + untracked)
+  - Adjustment reason / notes
+  - store_inventory_adjustment_list + line_list records
+- [ ] **3.2 Serialized item lifecycle**
+  - Full serialized_event_list tracking (purchase, sell, return, transfer, lost, etc.)
+  - Status change UI with event logging
+  - Serial number edit with audit trail
+- [ ] **3.3 Purchase orders**
+  - Create PO to supplier
+  - Receive PO → update inventory (tracked qty, serialized units)
+  - PO line matching (ordered vs received)
+- [ ] **3.4 Inter-store transfers**
+  - Create transfer request (source store)
+  - Confirm receipt (target store)
+  - Transfer line items (tracked/untracked/serialized)
+- [ ] **3.5 Repair ticket system**
+  - Create repair ticket (customer device info, issue description)
+  - Assign technician
+  - Status lifecycle (pending → completed → paid → cancelled)
+  - Link repair completion to payment transaction
+  - Repair-specific receipt / work order print
+- [ ] **3.6 Customer management**
+  - Customer CRUD (name, phone, email, notes)
+  - Customer balance tracking
+  - Transaction history per customer
+- [ ] **3.7 Refund & exchange**
+  - Refund flow (full/partial, back to original payment method or balance)
+  - Exchange flow (return old + sell new in one transaction)
+  - Related transaction linking (related_transaction_id)
+- [ ] **3.8 Reports & analytics**
+  - Daily sales summary (by shift, by batch)
+  - Sales by category / product
+  - Inventory valuation report
+  - Profit margin analysis
+  - Cash flow reconciliation
+
+---
+
+### Phase 4: Multi-Store Sync & Deployment
+> Make the system reliably work across 3 stores.
+
+- [ ] **4.1 Sync hardening**
+  - Full Outbox→Cloud→Inbox round-trip testing across 2+ stores
+  - Network failure recovery testing
+  - Conflict resolution for concurrent edits (customer, inventory)
+  - Sync status indicator in POS UI (online/offline/syncing/error)
+- [ ] **4.2 Deployment**
+  - Installer / update mechanism (ClickOnce or MSIX)
+  - Per-store SQLite DB provisioning
+  - Supabase project setup guide
+  - Config file per store/device
+- [ ] **4.3 User & permission management**
+  - User CRUD (admin function)
+  - Rights template assignment per store
+  - Permission enforcement in POS UI (hide/disable based on rights)
+
+---
+
+### Phase 5: Future / Post-Launch
+> Not in current scope, but documented for planning.
+
+- [ ] **5.1 Mobile web companion**
+  - QR code login from POS
+  - Photo capture for repair tickets
+  - Stocktaking assistance (scan + count)
+- [ ] **5.2 Web admin dashboard**
+  - Cross-store reports
+  - Remote inventory management
+  - Shared Blazor/Razor components with POS
+- [ ] **5.3 B2B web portal**
+  - Product catalog for wholesale buyers
+  - Online ordering
+- [ ] **5.4 Store demand system**
+  - Staff demand submission
+  - Manager review workflow
+- [ ] **5.5 Advanced features**
+  - Label printing (barcode/price tags)
+  - Customer loyalty / points system
+  - Multi-language UI switching (FR/EN)
