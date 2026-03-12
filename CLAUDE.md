@@ -311,6 +311,56 @@ When proposing next steps, prioritize implementable artifacts over abstract disc
 - QR login token/link flow
 - phased MVP implementation order
 
+## Historical Transaction Data Migration Pipeline
+
+### Background
+All 3 stores previously used **CellSmart POS**. As of late 2025, Decarie and Marcel have switched to **CellPoint POS**; Parcex will follow soon. Eventually all stores will migrate to GogoFix POS. This creates a need to consolidate historical transaction line data from multiple POS systems into one unified format.
+
+### 3-Level Data Pipeline
+```
+Level 1: Raw Export        →  Level 2: Standardized CSV    →  Level 3: Database
+(CellSmart / CellPoint       (unified format, locally         (local SQLite +
+ native export format)         stored, human-readable)          cloud Supabase)
+```
+- **Level 1 → Level 2**: Manual/scripted conversion. Raw exports vary by POS system (different column names, date formats, quirks like scientific notation IMEI corruption or date prefix errors). Each raw export is cleaned, validated, and converted into the standard CSV format.
+- **Level 2 → Level 3**: DataOps import tool loads CSVs into a dedicated `historical_transaction_line` table in both local SQLite and cloud Supabase. Both DataOps and POS can query this historical data.
+- **Level 2 files are kept** as local archive — CSV is human-readable and serves as a backup/audit trail.
+
+### Standard CSV Format (Level 2)
+**File naming**: `{store}_{YYYYMMDD}_{YYYYMMDD}.csv` (store name + start date + end date)
+**Location**: `C:\Users\jerry\source\repos\rawdata\`
+
+**13 columns, consistent across all stores:**
+```
+ID, Time, Customer, Phone Number, Product Name, Invoice Type, IMIE Number, Rep Name, Unit Price, Discount, Quantity, Tax Amount, Ext Amount
+```
+
+**Time format**: `M-D-YY h:mm AM/PM` (e.g., `12-31-25 5:19 PM`)
+**Currency fields**: prefixed with `$` (e.g., `$239.17`)
+
+### Current CSV Files
+| File | Store | Rows | Date Range |
+|------|-------|------|------------|
+| `decarie_20170410_20251231.csv` | Decarie | 263,296 | 2017-04-10 → 2025-12-31 |
+| `parcex_20180328_20260131.csv` | Parcex | 70,692 | 2018-03-28 → 2026-01-31 |
+| `marcel_20250709_20251209.csv` | Marcel | 1,260 | 2025-07-09 → 2025-12-09 |
+
+### Known Data Quality Issues (Resolved)
+- **Decarie**: 829 rows had corrupted dates — `20` prefix turned `12-DD-25` into `2012-DD-25` (YYYY-MM-DD format with 24h time). Fixed by stripping `20` prefix and converting 24h → 12h time.
+- **Parcex**: Original time format was `YYYYMMDD HH.mm` (e.g., `20260131 18.41`). Converted to standard `M-D-YY h:mm AM/PM` format.
+- **Parcex**: Column was named `Time_normalized` instead of `Time`. Renamed to match standard.
+- **Decarie**: Column names used short lowercase (`#`, `time`, `name`, etc.). Renamed to match standard verbose names.
+- **Marcel**: Had duplicate `Phone Number` column (raw + formatted). Dropped the formatted duplicate.
+- **All files**: IMEI numbers verified — no scientific notation corruption found.
+
+### TODO: Level 3 Database Table
+- [ ] Design `historical_transaction_line` table schema (local SQLite + Supabase)
+- [ ] Add `store_id` column to link records to stores
+- [ ] DataOps import tool: CSV → `historical_transaction_line` with validation
+- [ ] DataOps / POS query UI for historical data browsing
+
+---
+
 ## Development TODO / Roadmap
 
 Target: usable DataOps by ~mid April 2026, POS MVP trial in-store by ~May 2026.
@@ -472,7 +522,17 @@ GogoFix.Core/
   - Click JSON cell → popup JSON editor with syntax highlighting + validation
   - Format/minify toggle
 
-#### 1.3 Import / Export
+#### 1.3 Historical data migration (CellSmart/CellPoint → GogoFix)
+> Files: `GogoFix.DataOps/Views/ImportExportPage.xaml` (integrated into Import/Export page)
+> See also: "Historical Transaction Data Migration Pipeline" section above
+
+- [ ] Create `historical_transaction_line` table in LocalSchema.sql + Supabase SQL
+- [ ] CSV import wizard: select store → select CSV file → preview → import into `historical_transaction_line`
+- [ ] Validation: date range, duplicate detection (by store + ID + time), column format checks
+- [ ] Historical data browser: query/filter/search past transactions by store, date range, customer, product
+- [ ] Future: raw data converter tool (Level 1 → Level 2 automation for CellPoint exports)
+
+#### 1.4 Import / Export (general)
 > Files: `GogoFix.DataOps/Views/ImportExportPage.xaml` + `ViewModels/ImportExportViewModel.cs`
 
 - [ ] **CSV Export:**
@@ -500,7 +560,7 @@ GogoFix.Core/
     - Sample serialized items (10 phones with IMEI)
   - Uses realistic French/English data (Montreal-area addresses, common phone brands)
 
-#### 1.4 Sync testing & debugging
+#### 1.5 Sync testing & debugging
 > Files: `GogoFix.DataOps/Views/SyncMonitorPage.xaml` + `ViewModels/SyncMonitorViewModel.cs`
 
 - [ ] **Outbox panel:**
@@ -520,7 +580,7 @@ GogoFix.Core/
   - Pending outbox count, unapplied inbox count
   - "Start Auto-Sync" / "Stop Auto-Sync" toggle (starts `SyncBackgroundService`)
 
-#### 1.5 Data migration & cleanup utilities
+#### 1.6 Data migration & cleanup utilities
 > Files: `GogoFix.DataOps/Views/MigrationPage.xaml` + `ViewModels/MigrationViewModel.cs`
 
 - [ ] **FK integrity check:**
@@ -534,7 +594,7 @@ GogoFix.Core/
   - "Reset Sync State" (clear outbox + inbox + checkpoint)
   - "Recount Row Totals" (recalculate cached counts if any)
 
-#### 1.6 Query console
+#### 1.7 Query console
 > Files: `GogoFix.DataOps/Views/QueryConsolePage.xaml` + `ViewModels/QueryConsoleViewModel.cs`
 
 - [ ] **SQL editor:**
