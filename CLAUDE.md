@@ -6,7 +6,8 @@ GogoFix is a multi-store POS (Point of Sale) system designed for phone repair sh
 - **Business**: 3 retail stores currently, selling phones/accessories, repair services, and misc products. May expand to more stores or commercialize the system for other businesses in the distant future (not a current priority).
 - **Client**: WPF (C#) Windows desktop application (primary). A web companion (for tasks like photo capture, stocktaking, etc.) is planned for the future.
 - **Backend**: Supabase (PostgreSQL) as cloud database + local SQLite for offline capability. The system must remain fully operational even when internet or Supabase is unavailable — no business downtime allowed.
-- **Stage**: Database schema design phase — actively restructuring and rewriting all SQL schema files.
+- **Stage**: Phase 0 complete (Core foundation library built). Phase 1 DataOps UI next.
+- **WPF Repo**: https://github.com/Baeseata/GogoFix (master branch, .NET 10)
 - **UI Language**: French and English
 - **Code Language**: Comments in English and Chinese; SQL and code in English
 
@@ -314,7 +315,8 @@ When proposing next steps, prioritize implementable artifacts over abstract disc
 
 Target: usable DataOps by ~mid April 2026, POS MVP trial in-store by ~May 2026.
 
-Runtime: .NET 10, WPF desktop, Visual Studio. Current status: VS projects created (GogoFix.Core, GogoFix.DataOps, GogoFix), SQL schemas done, C# code just scaffolded.
+Runtime: .NET 10, WPF desktop, Visual Studio.
+Current status: **Phase 0 COMPLETE** (2026-03-12). GogoFix.Core foundation library fully built, 27 entity models, Dapper data access, SQLite schema initializer, Serilog logging — all verified working.
 
 **Key technical decisions:**
 - **ORM**: raw SQL schema creation (execute .sql files) + Dapper for query/mapping. NOT using EF Core.
@@ -323,136 +325,98 @@ Runtime: .NET 10, WPF desktop, Visual Studio. Current status: VS projects create
 
 ---
 
-### Phase 0: GogoFix.Core — Foundation Layer
-> Core is the shared library that both DataOps and POS depend on. Must be solid before anything else.
-> Confirmed: remove EF Core from POS project, move all DB logic to Core, both apps reference Core.
+### Phase 0: GogoFix.Core — Foundation Layer ✅ COMPLETE (2026-03-12)
+> Core is the shared library that both DataOps and POS depend on.
+> Commit: `c375b5b` on https://github.com/Baeseata/GogoFix
 
-#### 0.1 Project setup & NuGet
-- [ ] Add NuGet packages to GogoFix.Core.csproj:
-  - `Microsoft.Data.Sqlite` — SQLite connection & commands
-  - `Dapper` — lightweight object mapping
-  - `Supabase` (supabase-csharp) — Supabase REST client
-  - `Serilog` + `Serilog.Sinks.File` — structured logging
-  - `BCrypt.Net-Next` — password hashing (for auth)
-- [ ] Remove EF Core packages from GogoFix.csproj, delete Migrations/ folder and old LocalDbContext
-- [ ] Add `GogoFix.Core` project reference to GogoFix.DataOps.csproj (already done for GogoFix.csproj)
+#### 0.1 Project setup & NuGet ✅
+- [x] GogoFix.Core NuGet packages: `Dapper`, `Microsoft.Data.Sqlite`, `Serilog` + `Serilog.Sinks.File` + `Serilog.Sinks.Console`
+- [x] Removed all EF Core packages from GogoFix.csproj, deleted `LocalDatabase/` and `Migrations/` folders
+- [x] Both GogoFix and GogoFix.DataOps reference GogoFix.Core
+- Note: `Supabase` (supabase-csharp) and `BCrypt.Net-Next` deferred to when cloud sync / auth is needed
 
-#### 0.2 Configuration system
-> File: `GogoFix.Core/Configuration/AppConfig.cs`
+#### 0.2 Configuration system ✅
+- [x] `AppSettings.cs` — root config with `LocalDatabaseSettings`, `LoggingSettings`, `StoreId`, `DeviceId`
+- [x] `ConfigurationLoader.cs` — loads `appsettings.json` from app base directory via `System.Text.Json`
+- [x] Each app has its own `appsettings.json` (CopyToOutputDirectory: PreserveNewest)
+- Simplified from original plan: single `AppSettings` class instead of separate config files per concern. Supabase config section will be added when needed.
 
-- [ ] `AppConfig` class — deserialized from `appsettings.json` (per-app, per-device)
-  ```
-  GogoFix.Core/
-    Configuration/
-      AppConfig.cs          # root config model
-      StoreConfig.cs        # store_id, store_name, tax rates
-      DeviceConfig.cs       # device_id, terminal_no, environment (dev/register/amir/tech)
-      SupabaseConfig.cs     # Url, AnonKey, ServiceKey
-      PathConfig.cs         # SqliteDbPath, SqlSchemaDir, LogDir, AttachmentDir
-      ConfigLoader.cs       # load/save JSON config, merge defaults
-  ```
-- [ ] Config file location: `%LocalAppData%/GogoFix/appsettings.json`
-- [ ] DataOps and POS each have their own `appsettings.json` but share the same schema
+#### 0.3 SQLite data access layer ✅
+- [x] `SqliteConnectionFactory.cs` — creates connections with `PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;`
+- [x] `SchemaInitializer.cs` — executes embedded SQL resource (`LocalSchema.sql`, 1818 lines, all 27 tables)
+- [x] `EnsureDatabaseCreated()` — creates DB directory + file + runs schema on first launch
+- [x] Database path: `%LocalAppData%/GogoFix/local.db`
+- Implementation note: schema SQL is embedded as assembly resource (not read from filesystem). All 27 CREATE TABLE IF NOT EXISTS statements are concatenated into one file for idempotent execution.
 
-#### 0.3 SQLite data access layer
-> Files: `GogoFix.Core/Database/Sqlite/`
+#### 0.4 Supabase data access layer — DEFERRED
+> Deferred to Phase 1 / Phase 2. Phase 0 focuses entirely on local SQLite foundation.
 
-- [ ] **`SqliteConnectionManager.cs`**
-  - `GetConnection(string? dbPath = null)` → returns open `SqliteConnection`
-  - Connection string: `Data Source={path};Mode=ReadWriteCreate;`
-  - Always execute `PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;` on open
-  - Singleton pattern per db file path (connection pooling via dictionary)
-- [ ] **`SqliteSchemaInitializer.cs`**
-  - `InitializeAsync(SqliteConnection conn, string sqlSchemaDir)` → reads all `Local SQLite/*.sql` files in order (01→27), executes each
-  - `GetSchemaVersion(SqliteConnection conn)` → read from a `_schema_meta` table (to be created)
-  - `IsInitialized(SqliteConnection conn)` → check if tables exist
-  - Creates a `_schema_meta` table: `(key TEXT PK, value TEXT)` to store schema_version, initialized_at
-- [ ] **`SqliteQueryHelper.cs`** (thin Dapper wrapper)
-  - `QueryAsync<T>(string sql, object? param)` → Dapper query
-  - `QueryFirstOrDefaultAsync<T>(string sql, object? param)`
-  - `ExecuteAsync(string sql, object? param)` → INSERT/UPDATE/DELETE
-  - `ExecuteInTransactionAsync(Func<SqliteConnection, SqliteTransaction, Task> action)` — critical for outbox pattern (business write + outbox write in one transaction)
-  - All methods accept optional `SqliteConnection` to allow transaction reuse
+#### 0.5 Data models & enums ✅
+- [x] **Enums** (`GogoFix.Core/Enums/Enums.cs`): InventoryMode, ValuationMethod, SerializedStatus, SerializedEventType, TransactionType, SyncStatus, DemandStatus, DeviceEnvironment, TransferStatus, AdjustmentType
+- [x] **Entity classes** (`GogoFix.Core/Entities/`, 27 files — one per table): Store, UserRightsTemplate, User, StoreUserRights, Supplier, MotherInventoryItem, Customer, StoreInventoryItem, StoreSerializedItem, Batch, Shift, Transaction, TransactionLine, InventoryAdjustment, InventoryAdjustmentLine, SerializedEvent, StoreTransfer, StoreTransferLine, StoreItemHistory, PurchaseOrder, PurchaseOrderLine, RepairTicket, RepairTicketLine, StoreDemand, Device, SyncOutbox, SyncInbox
+- [x] **Dapper snake_case mapping**: `DefaultTypeMap.MatchNamesWithUnderscores = true` (auto maps `created_at` → `CreatedAt`)
+- [x] **Enum type handlers** (`EnumTypeHandlers.cs`): PascalCase C# enum ↔ snake_case DB string (e.g., `InStock` ↔ `"in_stock"`)
+- [x] `[Table("table_name")]` and `[Key]` custom attributes for repository pattern
+- Implementation note: timestamps stored as `string` in entities (matching SQLite TEXT storage). JSON columns also `string` — parsing done at service layer.
 
-#### 0.4 Supabase data access layer
-> Files: `GogoFix.Core/Database/Supabase/`
+#### 0.6 Sync engine (Outbox/Inbox) — DEFERRED
+> Deferred to Phase 1 DataOps sync monitor. Phase 0 provides the entity models (`SyncOutbox`, `SyncInbox`) and the DB tables. Actual sync logic (sender/poller/applier/background service) will be built when Supabase integration begins.
 
-- [ ] **`SupabaseClientManager.cs`**
-  - `Initialize(SupabaseConfig config)` → create and cache `Supabase.Client`
-  - `GetClient()` → return cached client (throw if not initialized)
-  - `IsConnected()` → lightweight connectivity check (ping or simple query)
-- [ ] **`SupabaseQueryHelper.cs`**
-  - `SelectAsync<T>(string table, string? filter, string? order, int? limit)`
-  - `InsertAsync<T>(string table, T row)`
-  - `UpsertAsync<T>(string table, T row)`
-  - `UpdateAsync(string table, object values, string filter)`
-  - `DeleteAsync(string table, string filter)` — soft delete only (set deleted_at)
-  - `RpcAsync<T>(string functionName, object? param)` — for stored procedures
-  - All methods return `Result<T>` wrapper (success/error/offline)
-- [ ] **`SupabaseRawSqlExecutor.cs`** (for DataOps)
-  - `ExecuteSqlAsync(string sql)` → execute arbitrary SQL via Supabase SQL API (pg_net or management API)
-  - Used by DataOps to push schema files to cloud
+#### 0.7 Logging ✅
+- [x] `LoggerSetup.cs` — Serilog init with file sink (`gogofix-{Date}.log`, rolling daily, 30-day retention) + console sink
+- [x] Log directory: `%LocalAppData%/GogoFix/Logs/`
+- [x] Minimum level configurable via `appsettings.json`
 
-#### 0.5 Data models & enums
-> Files: `GogoFix.Core/Models/`
+#### 0.8 Bootstrapper & App Wiring ✅ (added during implementation)
+- [x] `CoreBootstrapper.cs` — single `Initialize()` call: load config → setup logging → configure Dapper → register enum handlers → create DB
+- [x] `CoreServices.cs` — holds `AppSettings` + `SqliteConnectionFactory` + `ILogger`
+- [x] `BaseRepository.cs` — generic CRUD via Dapper reflection (InsertAsync, UpdateAsync, GetByIdAsync, GetAllAsync, SoftDeleteAsync, QueryAsync, ExecuteAsync)
+- [x] `NamingHelper.cs` — PascalCase → snake_case converter for dynamic SQL generation
+- [x] Both `GogoFix/App.xaml.cs` and `GogoFix.DataOps/App.xaml.cs` call `CoreBootstrapper.Initialize()` on startup
 
-- [ ] **Enum definitions** — `GogoFix.Core/Models/Enums/`
-  ```
-  InventoryMode.cs        # Service, Untracked, Tracked, Serialized
-  ValuationMethod.cs      # Average, Rate, Fixed
-  StockBucket.cs          # Empty, VeryFew, Few, Normal, TooMuch
-  SerializedStatus.cs     # InStock, InTransit, Sold, Repair, Lost, Wasted, Void
-  TransactionType.cs      # Exchange, Serialized, Repair, Sale, Refund, Payment
-  SerializedEventType.cs  # Purchase, Sell, Return, MarkAsSold, ... (13 values)
-  RepairStatus.cs         # Pending, Completed, Paid, Cancelled
-  DemandStatus.cs         # Pending, Processing, Rejected, Done
-  DeviceEnvironment.cs    # Dev, Register, Amir, Tech
-  SyncEventType.cs        # TransactionCommitted, ... (9 values)
-  SyncOutboxStatus.cs     # Pending, Acted, Error
-  ```
-- [ ] **Entity classes** — `GogoFix.Core/Models/Entities/` (one class per table, 27 files)
-  - Priority order (needed first for DataOps): StoreList, MotherInventoryList, SupplierList, UserList, CustomerList, SyncOutbox, SyncInbox
-  - Each class: properties matching SQL columns, snake_case column name attributes for Dapper
-  - Use `[Column("column_name")]` attribute or Dapper `DefaultTypeMap` for snake_case mapping
-  - Nullable types where SQL allows NULL
-- [ ] **`DapperTypeHandlers.cs`** — custom type handlers for:
-  - `string[]` ↔ JSON text (SQLite stores arrays as JSON text)
-  - Enum ↔ string mapping
-  - `DateTime` ↔ SQLite text timestamp
+#### GogoFix.Core Actual File Tree (as built)
+```
+GogoFix.Core/
+├── GogoFix.Core.csproj
+├── CoreBootstrapper.cs              # one-call init entry point
+├── CoreServices.cs                  # service bag (settings + DB factory + logger)
+├── Attributes/
+│   └── TableAttribute.cs            # [Table] + [Key] attributes
+├── Configuration/
+│   ├── AppSettings.cs               # config POCO
+│   └── ConfigurationLoader.cs       # JSON loader
+├── Database/
+│   ├── DapperConfig.cs              # MatchNamesWithUnderscores
+│   ├── EnumTypeHandlers.cs          # enum ↔ snake_case string
+│   ├── SchemaInitializer.cs         # executes embedded SQL
+│   ├── SqliteConnectionFactory.cs   # connection + WAL + FK pragmas
+│   └── Schema/
+│       └── LocalSchema.sql          # 27 tables (embedded resource, 1818 lines)
+├── Entities/                        # 27 entity classes
+│   ├── Store.cs               ├── Customer.cs
+│   ├── UserRightsTemplate.cs  ├── StoreInventoryItem.cs
+│   ├── User.cs                ├── StoreSerializedItem.cs
+│   ├── StoreUserRights.cs     ├── Batch.cs
+│   ├── Supplier.cs            ├── Shift.cs
+│   ├── MotherInventoryItem.cs ├── Transaction.cs
+│   ├── TransactionLine.cs     ├── InventoryAdjustment.cs
+│   ├── InventoryAdjustmentLine.cs  ├── SerializedEvent.cs
+│   ├── StoreTransfer.cs       ├── StoreTransferLine.cs
+│   ├── StoreItemHistory.cs    ├── PurchaseOrder.cs
+│   ├── PurchaseOrderLine.cs   ├── RepairTicket.cs
+│   ├── RepairTicketLine.cs    ├── StoreDemand.cs
+│   ├── Device.cs              ├── SyncOutbox.cs
+│   └── SyncInbox.cs
+├── Enums/
+│   └── Enums.cs                     # all business enums
+├── Helpers/
+│   └── NamingHelper.cs              # PascalCase → snake_case
+├── Logging/
+│   └── LoggerSetup.cs               # Serilog init
+└── Repositories/
+    └── BaseRepository.cs            # generic CRUD via Dapper
+```
 
-#### 0.6 Sync engine (Outbox/Inbox) — basic framework
-> Files: `GogoFix.Core/Sync/`
-> Note: full sync logic is complex. Phase 0 builds the framework; Phase 1 DataOps will test it; Phase 2 POS will use it in production.
-
-- [ ] **`SyncOutboxWriter.cs`**
-  - `EnqueueAsync(SqliteConnection conn, SqliteTransaction tx, SyncOutbox item)` — write to sync_outbox within caller's transaction
-  - Called by business logic after writing business data
-- [ ] **`SyncOutboxSender.cs`**
-  - `ProcessPendingAsync()` — query pending outbox rows, push each to Supabase `sync_changes` table
-  - On success: update status → `acted`, set `acted_at`
-  - On failure: update status → `error`, increment retry, set `last_error`
-  - Idempotent: uses `event_id` as unique key in cloud
-- [ ] **`SyncInboxPoller.cs`**
-  - `PollAsync()` — query Supabase `sync_changes` WHERE `change_id > last_checkpoint`
-  - Store checkpoint in local `_schema_meta` table (key: `sync_inbox_checkpoint`)
-  - Returns list of new change events
-- [ ] **`SyncInboxApplier.cs`** (stub for now — full logic per event_type comes in Phase 2)
-  - `ApplyAsync(SyncInbox item)` — dispatch by event_type, apply to local SQLite
-  - Dedup: skip if event_id already exists in sync_inbox
-  - Record applied_at timestamp
-- [ ] **`SyncBackgroundService.cs`**
-  - Timer-based loop (configurable interval, default 30s)
-  - Run `SyncOutboxSender.ProcessPendingAsync()` then `SyncInboxPoller.PollAsync()` + apply
-  - Graceful start/stop, error isolation (one failure doesn't kill the loop)
-  - Status property: `Idle / Syncing / Error / Offline`
-
-#### 0.7 Logging
-> File: `GogoFix.Core/Logging/LogSetup.cs`
-
-- [ ] Serilog initialization: file sink to `%LocalAppData%/GogoFix/logs/gogofix-{Date}.log`
-- [ ] Log rotation: 1 file per day, retain 30 days
-- [ ] Global static `Log.Information()` / `Log.Error()` pattern
-- [ ] All DB operations and sync events logged at Debug/Information level
 
 ---
 
