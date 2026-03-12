@@ -52,6 +52,7 @@ Sorted by SQL filename:
 - `24_cloud_store_demand_list.sql`
 - `25_cloud_device_list.sql`
 - `26_cloud_sync_changes.sql`
+- `28_cloud_historical_transaction_line.sql`
 
 ### Multi-Store Model
 All data is scoped by `store_id` (text, e.g., "decarie", "marcel"). Stores share a global product catalog (`mother_inventory_list`) but maintain independent inventory, transactions, and users.
@@ -116,7 +117,10 @@ All data is scoped by `store_id` (text, e.g., "decarie", "marcel"). Stores share
 - **`device_list`** (file 25): POS terminal registry table. Stores per-device metadata (`device_id`, `terminal_no`, `device_name`, app version, last heartbeat), runtime environment (`dev/register/amir/tech`), active flag, and soft delete. `terminal_no` is unique per store among active rows.
 
 #### 11. Sync Event Log
-- **`sync_changes`** (file 26): Cloud sync event log (append-only). One completed business action writes one event row with idempotent `event_id`, optional `correlation_id`, `event_type`, `entity_ids[]`, store scope fields, and `payload_json`. Client must write business data and `sync_changes` in the same DB transaction (all succeed or all rollback).
+- **`sync_changes`** (file 26): Cloud sync event log (append-only).
+
+#### 12. Historical Data
+- **`historical_transaction_line`** (file 28): Legacy POS transaction line data imported from CellSmart/CellPoint. Scoped by `store_id` FK. Auto-increment `row_id` PK. Dedup via UNIQUE on `(store_id, source_id, transaction_time, product_name)`. Includes `source_pos` to track origin system. Does NOT participate in sync engine. One completed business action writes one event row with idempotent `event_id`, optional `correlation_id`, `event_type`, `entity_ids[]`, store scope fields, and `payload_json`. Client must write business data and `sync_changes` in the same DB transaction (all succeed or all rollback).
 
 ### Key Design Patterns
 1. **Soft Delete**: All major tables use `deleted_at` (NULL = active). Partial unique indexes exclude deleted rows.
@@ -142,6 +146,7 @@ store_list
   +-- store_demand_list (store_id)
   +-- device_list (store_id)
   +-- sync_changes (source_store_id / target_store_id)
+  +-- historical_transaction_line (store_id)
 
 mother_inventory_list (unique_id)
   +-- store_inventory_list (unique_id)
@@ -199,6 +204,7 @@ GogoFix/
     24_cloud_store_demand_list.sql                    # store_demand_list + demand_status ENUM
     25_cloud_device_list.sql                          # device_list + device_environment ENUM
     26_cloud_sync_changes.sql                         # sync_changes + sync_event_type ENUM
+    28_cloud_historical_transaction_line.sql           # historical_transaction_line (legacy POS import)
 ```
 
 ## Notes for Claude
@@ -219,6 +225,7 @@ A new folder `Local SQLite/` is provided alongside `Supabase SQL/`.
 - `Local SQLite/01_local_*.sql` to `Local SQLite/25_local_*.sql`: local executable SQLite DDL for the 25 business tables.
 - `Local SQLite/26_local_sync_outbox.sql`: local outbound sync queue (`pending/acted/error` status state machine).
 - `Local SQLite/27_local_sync_inbox.sql`: local inbound dedupe/apply log by `event_id`.
+- `Local SQLite/28_local_historical_transaction_line.sql`: legacy POS historical transaction line data (CellSmart/CellPoint imports).
 
 Design notes:
 - PostgreSQL-specific types (`uuid`, `jsonb`, `timestamptz`, arrays, enum types) are mapped into SQLite-compatible definitions while preserving business semantics with `CHECK` constraints where needed.
@@ -353,11 +360,19 @@ ID, Time, Customer, Phone Number, Product Name, Invoice Type, IMIE Number, Rep N
 - **Marcel**: Had duplicate `Phone Number` column (raw + formatted). Dropped the formatted duplicate.
 - **All files**: IMEI numbers verified — no scientific notation corruption found.
 
-### TODO: Level 3 Database Table
-- [ ] Design `historical_transaction_line` table schema (local SQLite + Supabase)
-- [ ] Add `store_id` column to link records to stores
+### Level 3 Database Table ✅
+- [x] `historical_transaction_line` table created (file 28, local SQLite + Supabase)
+- [x] `store_id` FK to `store_list` (values: "decarie", "marcel", "parcex")
+- [x] `source_pos` column tracks origin system ("cellsmart", "cellpoint", "gogofix")
+- [x] Dedup via UNIQUE constraint on `(store_id, source_id, transaction_time, product_name)`
+- [x] `row_id` auto-increment surrogate PK (source IDs not unique across stores)
 - [ ] DataOps import tool: CSV → `historical_transaction_line` with validation
 - [ ] DataOps / POS query UI for historical data browsing
+
+### Raw Data Samples (Level 1 formats)
+Located in `C:\Users\jerry\source\repos\rawdata\`:
+- `rptTransactions-parcex.csv` — **CellSmart** export format sample (3 header rows, spacer columns)
+- `xrTransactionHistory-marcel.csv` — **CellPoint** export format sample (4 header rows, different column names, has Cost/Profit columns)
 
 ---
 
@@ -526,7 +541,7 @@ GogoFix.Core/
 > Files: `GogoFix.DataOps/Views/ImportExportPage.xaml` (integrated into Import/Export page)
 > See also: "Historical Transaction Data Migration Pipeline" section above
 
-- [ ] Create `historical_transaction_line` table in LocalSchema.sql + Supabase SQL
+- [x] Create `historical_transaction_line` table in LocalSchema.sql + Supabase SQL (file 28)
 - [ ] CSV import wizard: select store → select CSV file → preview → import into `historical_transaction_line`
 - [ ] Validation: date range, duplicate detection (by store + ID + time), column format checks
 - [ ] Historical data browser: query/filter/search past transactions by store, date range, customer, product
